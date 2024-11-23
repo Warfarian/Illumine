@@ -1,7 +1,11 @@
-import Form from "../components/Forms"
+import Form from "../components/Forms";
 
 function Login() {
-    return <Form route="/api/token/" method="login" />
+    return (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+            <Form route="/api/token/" method="login" />
+        </div>
+    );
 }
 
 export default Login;
