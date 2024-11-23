@@ -1,36 +1,37 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom"; 
 import api from "../api";
-import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
 
-function Form({ route, method }) {
+function Form({ route, method, onSuccess, onFailure }) {
     const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [email, setEmail] = useState("");  
+    const [role, setRole] = useState("student");
     const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
-    const name = method === "login" ? "Login" : "Register";
+    const navigate = useNavigate(); 
+    const isRegister = method === "register"; 
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
 
         try {
-            const res = await api.post(route, {
-                username,
-                password,
-                ...(method === "register" && { email }), 
-            });
+            const data = { username, email, password };
+            if (isRegister) data.role = role;
 
-            if (method === "login") {
-                localStorage.setItem(ACCESS_TOKEN, res.data.access);
-                localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-                navigate("/faculty");
-            } else {
-                navigate("/login");
+            const res = await api.post(route, data);
+
+            if (onSuccess) {
+                onSuccess(res.data);
+
+                if (isRegister) {
+                    navigate("/login"); 
+                }
             }
         } catch (error) {
-            alert(error);
+            if (onFailure) {
+                onFailure("Invalid credentials. Please try again.");
+            }
         } finally {
             setLoading(false);
         }
@@ -38,33 +39,46 @@ function Form({ route, method }) {
 
     return (
         <form onSubmit={handleSubmit} className="form-container">
-            <h1>{name}</h1>
+            <h1>{isRegister ? "Register" : "Login"}</h1>
             <input
                 type="text"
                 className="form-input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
+                required
             />
-            <input
-                type="password"
-                className="form-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-            />
-            {method === "register" && (
+            {isRegister && (
                 <input
                     type="email"
                     className="form-input"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter email"
+                    required
                 />
+            )}
+            <input
+                type="password"
+                className="form-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                required
+            />
+            {isRegister && (
+                <select
+                    className="form-input"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                >
+                    <option value="student">Student</option>
+                    <option value="faculty">Faculty</option>
+                </select>
             )}
             {loading && <div className="loading-spinner">Loading...</div>}
             <button type="submit" className="form-button">
-                {name}
+                {isRegister ? "Register" : "Login"}
             </button>
         </form>
     );

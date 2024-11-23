@@ -106,3 +106,12 @@ h1 {
 .register-container a:hover {
     text-decoration: underline;
 }
+
+.register-link{
+    text-align: center;
+}
+
+.register-link a{
+    color: #007bff;
+    text-decoration: none;
+}

@@ -1,81 +1,69 @@
-import { Navigate } from "react-router-dom";
-import {jwtDecode} from "jwt-decode";
+import { Navigate, useLocation } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 import api from "../api";
 import { REFRESH_TOKEN, ACCESS_TOKEN, USER_ROLE } from "../constants";
 import { useState, useEffect } from "react";
 
 function ProtectedRoute({ children, allowedRoles }) {
-    const [isAuthorized, setIsAuthorized] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isAuthorized, setIsAuthorized] = useState(false);
+    const location = useLocation();
 
     useEffect(() => {
-        authenticateUser().catch((err) => {
-            console.error("Authentication error:", err);
-            setIsAuthorized(false);
-        });
-    }, []);
+        const verifyAuth = async () => {
+            try {
+                await authenticateUser();
+                setIsAuthorized(true);
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                setIsAuthorized(false);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        verifyAuth();
+    }, [location.pathname]);
 
     const refreshToken = async () => {
         const refresh = localStorage.getItem(REFRESH_TOKEN);
-        if (!refresh) {
-            throw new Error("No refresh token available.");
-        }
+        if (!refresh) throw new Error("No refresh token");
 
-        try {
-            const res = await api.post("/api/token/refresh/", { refresh });
-            localStorage.setItem(ACCESS_TOKEN, res.data.access);
-            return res.data.access;
-        } catch (error) {
-            console.error("Refresh token failed:", error);
-            throw error;
-        }
+        const response = await api.post("/api/token/refresh/", { refresh });
+        const { access, role } = response.data;
+        localStorage.setItem(ACCESS_TOKEN, access);
+        localStorage.setItem(USER_ROLE, role);
+        return { access, role };
     };
 
     const authenticateUser = async () => {
         const token = localStorage.getItem(ACCESS_TOKEN);
-        if (!token) {
-            setIsAuthorized(false); 
-            return;
+        const storedRole = localStorage.getItem(USER_ROLE);
+
+        if (!token || !storedRole) {
+            throw new Error("No token or role");
         }
 
-        let decoded;
         try {
-            decoded = jwtDecode(token);
-        } catch (error) {
-            console.error("Failed to decode token:", error);
-            setIsAuthorized(false);
-            return;
-        }
+            const decoded = jwtDecode(token);
+            const now = Date.now() / 1000;
 
-        const now = Date.now() / 1000; 
-        const { exp: tokenExpiration, role: userRole } = decoded;
-
-
-        localStorage.setItem(USER_ROLE, userRole);
-
-        if (tokenExpiration < now) {
-            try {
-                const newToken = await refreshToken();
-                const { role: refreshedRole } = jwtDecode(newToken);
-                if (allowedRoles.includes(refreshedRole)) {
-                    setIsAuthorized(true);
-                } else {
-                    setIsAuthorized(false);
-                }
-            } catch (error) {
-                setIsAuthorized(false); 
+            if (decoded.exp < now) {
+                const { role: newRole } = await refreshToken();
+                return allowedRoles.includes(newRole);
             }
-        } else if (!allowedRoles.includes(userRole)) {
-            setIsAuthorized(false); 
-        } else {
-            setIsAuthorized(true); 
+
+            return allowedRoles.includes(storedRole);
+        } catch (error) {
+            throw new Error("Invalid token");
         }
     };
 
-    if (isAuthorized === null) {
+    if (isLoading) {
         return <div>Loading...</div>;
     }
 
-    return isAuthorized ? children : <Navigate to="/login" />;
+    return isAuthorized ? children : <Navigate to="/login" state={{ from: location }} replace />;
 }
 
 export default ProtectedRoute;

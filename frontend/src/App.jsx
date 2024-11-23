@@ -3,7 +3,6 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import FacultyHome from "./pages/FacultyHome";
 import StudentHome from "./pages/StudentHome";
-import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import './styles/styles.css';
 
@@ -11,9 +10,8 @@ function App() {
     return (
         <BrowserRouter>
             <Routes>
-                <Route path="/" element={<Register />} /> 
                 <Route
-                    path="/faculty"
+                    path="/faculty-home"
                     element={
                         <ProtectedRoute allowedRoles={["faculty"]}>
                             <FacultyHome />
@@ -21,7 +19,7 @@ function App() {
                     }
                 />
                 <Route
-                    path="/student"
+                    path="/student-home"
                     element={
                         <ProtectedRoute allowedRoles={["student"]}>
                             <StudentHome />
@@ -30,7 +28,7 @@ function App() {
                 />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="*" element={<NotFound />} />
+                <Route path="*" element={<div>Page Not Found</div>} />
             </Routes>
         </BrowserRouter>
     );
