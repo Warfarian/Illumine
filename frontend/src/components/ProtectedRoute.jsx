@@ -12,8 +12,8 @@ function ProtectedRoute({ children, allowedRoles }) {
     useEffect(() => {
         const verifyAuth = async () => {
             try {
-                await authenticateUser();
-                setIsAuthorized(true);
+                const authorized = await authenticateUser();
+                setIsAuthorized(authorized);
             } catch (error) {
                 console.error("Authentication failed:", error);
                 setIsAuthorized(false);
@@ -25,37 +25,26 @@ function ProtectedRoute({ children, allowedRoles }) {
         verifyAuth();
     }, [location.pathname]);
 
-    const refreshToken = async () => {
-        const refresh = localStorage.getItem(REFRESH_TOKEN);
-        if (!refresh) throw new Error("No refresh token");
-
-        const response = await api.post("/api/token/refresh/", { refresh });
-        const { access, role } = response.data;
-        localStorage.setItem(ACCESS_TOKEN, access);
-        localStorage.setItem(USER_ROLE, role);
-        return { access, role };
-    };
-
     const authenticateUser = async () => {
-        const token = localStorage.getItem(ACCESS_TOKEN);
-        const storedRole = localStorage.getItem(USER_ROLE);
+        const token = localStorage.getItem('access_token');
+        const storedRole = localStorage.getItem('user_role');
 
         if (!token || !storedRole) {
-            throw new Error("No token or role");
+            return false;
         }
 
         try {
             const decoded = jwtDecode(token);
             const now = Date.now() / 1000;
 
+            // Check token expiration
             if (decoded.exp < now) {
-                const { role: newRole } = await refreshToken();
-                return allowedRoles.includes(newRole);
+                await refreshToken();
             }
 
             return allowedRoles.includes(storedRole);
         } catch (error) {
-            throw new Error("Invalid token");
+            return false;
         }
     };
 
@@ -63,7 +52,7 @@ function ProtectedRoute({ children, allowedRoles }) {
         return <div>Loading...</div>;
     }
 
-    return isAuthorized ? children : <Navigate to="/login" state={{ from: location }} replace />;
+    return isAuthorized ? children : <Navigate to="/login" replace />;
 }
 
-export default ProtectedRoute;
+export default ProtectedRoute

@@ -10,22 +10,22 @@ function App() {
     return (
         <BrowserRouter>
             <Routes>
-                <Route
-                    path="/faculty-home"
-                    element={
-                        <ProtectedRoute allowedRoles={["faculty"]}>
-                            <FacultyHome />
-                        </ProtectedRoute>
-                    }
-                />
-                <Route
-                    path="/student-home"
-                    element={
-                        <ProtectedRoute allowedRoles={["student"]}>
-                            <StudentHome />
-                        </ProtectedRoute>
-                    }
-                />
+            <Route
+                path="/student_home"
+                element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                        <StudentHome />
+                    </ProtectedRoute>
+                }   
+            />
+            <Route
+                path="/faculty_home"
+                element={
+                    <ProtectedRoute allowedRoles={["faculty"]}>
+                        <FacultyHome />
+                    </ProtectedRoute>
+                }
+            />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="*" element={<div>Page Not Found</div>} />

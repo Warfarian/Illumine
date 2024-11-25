@@ -1,6 +1,6 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from rest_framework import serializers
-from .models import Student, Subject, Faculty
+from .models import Student, Subject, Faculty, Profile
 
 class UserSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=["faculty", "student"], write_only=True)
@@ -15,9 +15,11 @@ class UserSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data)
         
         if role == "faculty":
-            user.groups.add(Group.objects.get(name="Faculty"))
+            group, _ = Group.objects.get_or_create(name="Faculty")
+            user.groups.add(group)
         elif role == "student":
-            user.groups.add(Group.objects.get(name="Students"))
+            group, _ = Group.objects.get_or_create(name="Students")
+            user.groups.add(group)
         
         user.save()
         return user
@@ -31,17 +33,81 @@ class SubjectSerializer(serializers.ModelSerializer):
 
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    profile_picture = serializers.ImageField(required=False)
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
     subjects = SubjectSerializer(many=True, read_only=True)
     
     class Meta:
         model = Student
-        fields = ['id', 'user', 'profile_picture', 'first_name', 'last_name', 'dob', 'gender', 'blood_group', 'contact_number', 'address', 'faculty', 'subjects']
+        fields = ['id', 'user', 'profile_picture', 'first_name', 'last_name', 
+                 'dob', 'gender', 'blood_group', 'contact_number', 'address', 
+                 'faculty', 'subjects']
 
     def update(self, instance, validated_data):
-        user_data = validated_data.pop('user', None)
-        if user_data:
-            instance.user.username = user_data.get('username', instance.user.username)
-            instance.user.password = user_data.get('password', instance.user.password)
-            instance.user.save()
-        return super().update(instance, validated_data)
+        profile_picture = validated_data.pop('profile_picture', None)
+        if profile_picture:
+            # Delete old profile picture if it exists
+            if instance.profile_picture:
+                instance.profile_picture.delete(save=False)
+            instance.profile_picture = profile_picture
+            
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+            
+        instance.save()
+        return instance
+
+class ProfileSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email', read_only=True)
+    department = serializers.CharField(source='user.faculty.department', read_only=True)
+    profile_picture = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Profile
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 'department',
+            'dob', 'gender', 'blood_group', 'contact_number', 
+            'address', 'profile_picture'
+        ]
+
+    def get_profile_picture(self, obj):
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
+
+    def validate_dob(self, value):
+        """
+        Validate date of birth format
+        """
+        if value and isinstance(value, str):
+            try:
+                from datetime import datetime
+                datetime.strptime(value, '%Y-%m-%d')
+                return value
+            except ValueError:
+                raise serializers.ValidationError("Invalid date format. Use YYYY-MM-DD")
+        return value
+
+    def to_representation(self, instance):
+        """
+        Modify the data before sending to frontend
+        """
+        data = super().to_representation(instance)
+        
+        # Handle null values
+        for field in data:
+            if data[field] is None:
+                data[field] = ""
+                
+        # Format date
+        if data.get('dob'):
+            try:
+                from datetime import datetime
+                date_obj = datetime.strptime(data['dob'], '%Y-%m-%d')
+                data['dob'] = date_obj.strftime('%Y-%m-%d')
+            except:
+                pass
+                
+        return data

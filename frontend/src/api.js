@@ -1,12 +1,11 @@
 import axios from "axios";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "./constants";
 
-// Create axios instance with base configuration
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL,
+    baseURL: "http://localhost:8000",
     headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
     }
 });
 
@@ -62,17 +61,36 @@ const handleApiError = (error) => {
     }
 };
 
-// Request interceptor
+// Request interceptor  
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem(ACCESS_TOKEN);
+        console.log("Request config:", {
+            url: config.url,
+            method: config.method,
+            headers: config.headers,
+            data: config.data
+        });
+
+        // Don't add auth header for login/register endpoints
+        if (config.url.includes('/token/') || config.url.includes('/register/')) {
+            return config;
+        }
+
+        const token = localStorage.getItem('access_token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        if (config.data instanceof FormData) {
+            config.headers['Content-Type'] = 'multipart/form-data';
+        } else {
+            config.headers['Content-Type'] = 'application/json';
+        }
+
         return config;
     },
     (error) => {
-        console.error('Request Interceptor Error:', error);
+        console.error("Request interceptor error:", error);
         return Promise.reject(error);
     }
 );
@@ -83,31 +101,26 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // Handle 401 and token refresh
+        // If error is 401 and we haven't tried to refresh token yet
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
 
             try {
-                const refresh = localStorage.getItem(REFRESH_TOKEN);
-                if (!refresh) {
-                    throw new Error('No refresh token available');
-                }
+                const refreshToken = localStorage.getItem('refresh_token');
+                const response = await api.post('/api/token/refresh/', {
+                    refresh: refreshToken
+                });
 
-                const response = await api.post("/api/token/refresh/", { refresh });
                 const { access } = response.data;
+                localStorage.setItem('access_token', access);
 
-                if (!access) {
-                    throw new Error('No access token received');
-                }
-
-                localStorage.setItem(ACCESS_TOKEN, access);
+                // Retry the original request
                 originalRequest.headers.Authorization = `Bearer ${access}`;
-
                 return api(originalRequest);
             } catch (refreshError) {
-                console.error('Token refresh failed:', refreshError);
+                // If refresh token fails, logout user
                 localStorage.clear();
-                window.location.href = "/login";
+                window.location.href = '/login';
                 return Promise.reject(refreshError);
             }
         }

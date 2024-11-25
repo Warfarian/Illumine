@@ -1,36 +1,58 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
 import api from "../api";
+import '../styles/components/forms.css';
 
-function Form({ route, method, onSuccess, onFailure }) {
+function Form({ method, onSuccess, onFailure }) {
     const [username, setUsername] = useState("");
-    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [email, setEmail] = useState("");
     const [role, setRole] = useState("student");
     const [loading, setLoading] = useState(false);
-    const navigate = useNavigate(); 
-    const isRegister = method === "register"; 
+    const [error, setError] = useState("");
+    const navigate = useNavigate();
+
+    const isRegister = method === "register";
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setError("");
 
         try {
-            const data = { username, email, password };
-            if (isRegister) data.role = role;
+            const endpoint = isRegister ? '/api/register/' : '/api/token/';
+            const payload = {
+                username: username.trim(),
+                password: password.trim(),
+                ...(isRegister && { 
+                    email: email.trim(), 
+                    role: role.trim() 
+                })
+            };
 
-            const res = await api.post(route, data);
+            const response = await api.post(endpoint, payload);
 
-            if (onSuccess) {
-                onSuccess(res.data);
-
+            if (response.data) {
                 if (isRegister) {
-                    navigate("/login"); 
+                    alert("Registration successful! Please login with your credentials.");
+                    navigate('/login');
+                } else {
+                    localStorage.setItem('access_token', response.data.access);
+                    localStorage.setItem('refresh_token', response.data.refresh);
+                    localStorage.setItem('user_role', response.data.role);
+
+                    if (onSuccess) {
+                        onSuccess(response.data);
+                    }
                 }
             }
-        } catch (error) {
+        } catch (err) {
+            console.error("Form submission error:", err);
+            const errorMessage = err.response?.data?.detail || 
+                               (isRegister ? "Registration failed" : "Invalid username or password");
+            setError(errorMessage);
             if (onFailure) {
-                onFailure("Invalid credentials. Please try again.");
+                onFailure(err);
             }
         } finally {
             setLoading(false);
@@ -38,47 +60,71 @@ function Form({ route, method, onSuccess, onFailure }) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="form-container">
-            <h1>{isRegister ? "Register" : "Login"}</h1>
-            <input
-                type="text"
-                className="form-input"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username"
-                required
-            />
-            {isRegister && (
+        <form onSubmit={handleSubmit} className="form-content">
+            <div className="form-group">
+                <label className="form-label">Username</label>
                 <input
-                    type="email"
-                    className="form-input"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter email"
+                    type="text"
                     required
-                />
-            )}
-            <input
-                type="password"
-                className="form-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                required
-            />
-            {isRegister && (
-                <select
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     className="form-input"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                >
-                    <option value="student">Student</option>
-                    <option value="faculty">Faculty</option>
-                </select>
+                    placeholder="Username"
+                />
+            </div>
+
+            {isRegister && (
+                <div className="form-group">
+                    <label className="form-label">Email</label>
+                    <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="form-input"
+                        placeholder="Email"
+                    />
+                </div>
             )}
-            {loading && <div className="loading-spinner">Loading...</div>}
-            <button type="submit" className="form-button">
-                {isRegister ? "Register" : "Login"}
+
+            <div className="form-group">
+                <label className="form-label">Password</label>
+                <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="form-input"
+                    placeholder="Password"
+                />
+            </div>
+
+            {isRegister && (
+                <div className="form-group">
+                    <label className="form-label">Role</label>
+                    <select
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="form-select"
+                    >
+                        <option value="student">Student</option>
+                        <option value="faculty">Faculty</option>
+                    </select>
+                </div>
+            )}
+
+            {error && (
+                <div className="form-error">
+                    {error}
+                </div>
+            )}
+
+            <button
+                type="submit"
+                disabled={loading}
+                className="form-button"
+            >
+                {loading ? "Processing..." : (isRegister ? "Register" : "Sign in")}
             </button>
         </form>
     );
