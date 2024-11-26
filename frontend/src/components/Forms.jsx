@@ -30,16 +30,24 @@ function Form({ method, onSuccess, onFailure }) {
                 })
             };
 
+            console.log("Making request to:", endpoint);
+            console.log("With payload:", payload);
+
             const response = await api.post(endpoint, payload);
+            console.log("Server response:", response.data);
 
             if (response.data) {
                 if (isRegister) {
                     alert("Registration successful! Please login with your credentials.");
                     navigate('/login');
                 } else {
+                    if (!response.data.access || !response.data.refresh) {
+                        throw new Error("Invalid response format from server");
+                    }
+
                     localStorage.setItem('access_token', response.data.access);
                     localStorage.setItem('refresh_token', response.data.refresh);
-                    localStorage.setItem('user_role', response.data.role);
+                    localStorage.setItem('user_role', response.data.role?.toLowerCase() || '');
 
                     if (onSuccess) {
                         onSuccess(response.data);
@@ -47,10 +55,17 @@ function Form({ method, onSuccess, onFailure }) {
                 }
             }
         } catch (err) {
-            console.error("Form submission error:", err);
+            console.error("Request failed:", {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            
             const errorMessage = err.response?.data?.detail || 
-                               (isRegister ? "Registration failed" : "Invalid username or password");
+                               err.message || 
+                               "An error occurred during authentication";
             setError(errorMessage);
+            
             if (onFailure) {
                 onFailure(err);
             }

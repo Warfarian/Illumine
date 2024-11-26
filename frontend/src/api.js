@@ -61,38 +61,16 @@ const handleApiError = (error) => {
     }
 };
 
-// Request interceptor  
+// Request interceptor
 api.interceptors.request.use(
     (config) => {
-        console.log("Request config:", {
-            url: config.url,
-            method: config.method,
-            headers: config.headers,
-            data: config.data
-        });
-
-        // Don't add auth header for login/register endpoints
-        if (config.url.includes('/token/') || config.url.includes('/register/')) {
-            return config;
-        }
-
         const token = localStorage.getItem('access_token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
-
-        if (config.data instanceof FormData) {
-            config.headers['Content-Type'] = 'multipart/form-data';
-        } else {
-            config.headers['Content-Type'] = 'application/json';
-        }
-
         return config;
     },
-    (error) => {
-        console.error("Request interceptor error:", error);
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
 // Response interceptor
@@ -101,33 +79,60 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // If error is 401 and we haven't tried to refresh token yet
+        // If error is 401 and we haven't tried refreshing token yet
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
 
             try {
                 const refreshToken = localStorage.getItem('refresh_token');
-                const response = await api.post('/api/token/refresh/', {
-                    refresh: refreshToken
-                });
+                console.log('Attempting refresh with token:', refreshToken); // Debug log
 
-                const { access } = response.data;
-                localStorage.setItem('access_token', access);
+                if (!refreshToken) {
+                    throw new Error('No refresh token available');
+                }
 
-                // Retry the original request
-                originalRequest.headers.Authorization = `Bearer ${access}`;
-                return api(originalRequest);
+                const response = await axios.post(
+                    'http://localhost:8000/api/token/refresh/',
+                    { refresh: refreshToken }
+                );
+
+                if (response.data.access) {
+                    localStorage.setItem('access_token', response.data.access);
+                    originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
+                    return api(originalRequest);
+                }
             } catch (refreshError) {
-                // If refresh token fails, logout user
-                localStorage.clear();
+                console.error('Token refresh failed:', refreshError);
+                // Clear auth data and redirect to login
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('user_role');
                 window.location.href = '/login';
                 return Promise.reject(refreshError);
             }
         }
-
-        return handleApiError(error);
+        return Promise.reject(error);
     }
 );
 
+// Faculty profile endpoints
+export const getFacultyProfile = () => {
+    return api.get('/api/faculty/profile/');
+};
 
-export default api 
+export const updateFacultyProfile = (data) => {
+    return api.put('/api/faculty/profile/', data);
+};
+
+// Update profile endpoint
+export const updateProfile = async (profileData) => {
+    try {
+        const response = await api.put('/api/student/profile/', profileData);
+        return response.data;
+    } catch (error) {
+        console.error('Profile update error:', error);
+        throw error;
+    }
+};
+
+export default api;

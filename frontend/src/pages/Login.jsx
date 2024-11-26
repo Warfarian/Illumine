@@ -9,20 +9,28 @@ function Login() {
     const location = useLocation();
 
     const handleLoginSuccess = (data) => {
-        console.log("Login success data:", data); // Debug log
-        
+        console.log('Login response:', data); // Debug log
+
+        if (!data.access || !data.refresh) {
+            console.error('Missing token data:', data);
+            return;
+        }
+
         // Store tokens
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('refresh_token', data.refresh);
-        localStorage.setItem('user_role', data.role);
+        localStorage.setItem('user_role', data.role?.toLowerCase());
 
-        // Clear any previous error
-        setError(null);
+        console.log('Stored auth data:', {  // Debug log
+            access: !!localStorage.getItem('access_token'),
+            refresh: !!localStorage.getItem('refresh_token'),
+            role: localStorage.getItem('user_role')
+        });
 
-        // Determine redirect path based on role
-        const redirectPath = data.role === 'faculty' ? '/faculty_home' : '/student_home';
-        console.log("Redirecting to:", redirectPath); // Debug log
-        navigate(redirectPath, { replace: true });
+        // Navigate based on role
+        const role = data.role?.toLowerCase();
+        const redirectPath = role === 'student' ? '/student_home' : '/faculty_home';
+        navigate(redirectPath);
     };
 
     const handleLoginFailure = (error) => {

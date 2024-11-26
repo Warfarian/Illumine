@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.exceptions import TokenError
 from .models import Student, Faculty, Subject
 from .serializers import StudentSerializer, UserSerializer, SubjectSerializer,ProfileSerializer
 from .permissions import IsFaculty, IsStudent, IsOwnerOrReadOnly
@@ -13,6 +14,10 @@ from .models import Profile
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.http import Http404
+from rest_framework.decorators import api_view, permission_classes
+from django.conf import settings
+import os
 
 class RegisterSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=['student', 'faculty'], write_only=True)
@@ -101,30 +106,49 @@ class LoginView(TokenObtainPairView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
+        print("Login attempt received:", request.data)  # Debug log
+        
         try:
+            username = request.data.get('username')
+            password = request.data.get('password')
+
+            if not username or not password:
+                return Response(
+                    {"detail": "Both username and password are required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if user exists
+            try:
+                user = User.objects.get(username=username)
+                print(f"User found: {user.username}")
+                print(f"Groups: {[g.name for g in user.groups.all()]}")
+            except User.DoesNotExist:
+                print(f"No user found with username: {username}")
+                return Response(
+                    {"detail": "No account found with this username"},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+            # Attempt to get the token pair
             response = super().post(request, *args, **kwargs)
             
-            # Get the user
-            user = User.objects.get(username=request.data.get('username'))
-            
-            # Determine role
+            # If we get here, authentication was successful
             role = None
-            if user.groups.filter(name='student').exists():
+            if user.groups.filter(name__iexact='student').exists():
                 role = 'student'
-            elif user.groups.filter(name='faculty').exists():
+            elif user.groups.filter(name__iexact='faculty').exists():
                 role = 'faculty'
 
-            # Add role to response data
             response.data['role'] = role
-            
-            # Add redirect URL based on role
-            response.data['redirect_url'] = '/student_home/' if role == 'student' else '/faculty_home/'
+            print("Login successful:", response.data)
             
             return response
             
         except Exception as e:
+            print(f"Login error: {str(e)}")
             return Response(
-                {"detail": "Invalid credentials"},
+                {"detail": str(e)},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
@@ -229,16 +253,84 @@ class FacultyStudentAssignmentView(generics.UpdateAPIView):
         student.save()
         return Response(StudentSerializer(student).data)
 
-class StudentProfileView(generics.RetrieveUpdateAPIView):
-    serializer_class = StudentSerializer
-    permission_classes = [IsAuthenticated, IsStudent]
+class StudentProfileView(APIView):
+    permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
-    def get_object(self):
-        return self.request.user.student
-    
-    def perform_update(self, serializer):
-        serializer.save()  
+    def get(self, request):
+        try:
+            profile = Profile.objects.get(user=request.user)
+            student = Student.objects.get(user=request.user)
+            
+            data = {
+                'first_name': profile.first_name,
+                'last_name': profile.last_name,
+                'email': student.email,
+                'contact_number': profile.contact_number,
+                'address': profile.address,
+                'profile_picture': request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None,
+                'gender': profile.gender,
+                'dob': profile.dob,
+                'blood_group': profile.blood_group,
+                'roll_number': student.roll_number,
+                'department': student.department
+            }
+            return Response(data)
+        except Exception as e:
+            print(f"Error getting profile: {str(e)}")
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def put(self, request):
+        try:
+            profile = Profile.objects.get(user=request.user)
+            student = Student.objects.get(user=request.user)
+
+            # Handle profile picture
+            if 'profile_picture' in request.FILES:
+                profile.profile_picture = request.FILES['profile_picture']
+
+            # Update profile fields
+            profile.first_name = request.data.get('first_name', profile.first_name)
+            profile.last_name = request.data.get('last_name', profile.last_name)
+            profile.contact_number = request.data.get('contact_number', profile.contact_number)
+            profile.address = request.data.get('address', profile.address)
+            profile.gender = request.data.get('gender', profile.gender)
+            profile.blood_group = request.data.get('blood_group', profile.blood_group)
+            
+            # Handle date of birth
+            dob = request.data.get('dob')
+            if dob:
+                profile.dob = dob
+
+            profile.save()
+
+            # Update student fields
+            student.first_name = request.data.get('first_name', student.first_name)
+            student.last_name = request.data.get('last_name', student.last_name)
+            student.save()
+
+            return Response({
+                'first_name': profile.first_name,
+                'last_name': profile.last_name,
+                'email': student.email,
+                'contact_number': profile.contact_number,
+                'address': profile.address,
+                'profile_picture': request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None,
+                'gender': profile.gender,
+                'dob': profile.dob,
+                'blood_group': profile.blood_group,
+                'roll_number': student.roll_number,
+                'department': student.department
+            })
+        except Exception as e:
+            print(f"Error updating profile: {str(e)}")
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class SubjectFacultyView(generics.RetrieveAPIView):
     queryset = Student.objects.all()
@@ -310,28 +402,193 @@ class UserProfileView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
-class FacultyProfileView(generics.RetrieveUpdateAPIView):
+class FacultyProfileView(APIView):
     permission_classes = [IsAuthenticated, IsFaculty]
-    serializer_class = ProfileSerializer
 
-    def get_object(self):
-        return self.request.user.profile
-
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context['request'] = self.request
-        return context
-
-    def perform_update(self, serializer):
-        serializer.save()
-
-    def get(self, request, *args, **kwargs):
+    def get(self, request):
         try:
-            profile = self.get_object()
-            serializer = self.get_serializer(profile)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
+            print(f"Attempting to get profile for user: {request.user.username}")  # Debug log
+            
+            # Get or create faculty profile
+            faculty, created = Faculty.objects.get_or_create(
+                user=request.user,
+                defaults={'department': 'Computer Science'}  # Set a default department
             )
+            print(f"Faculty profile {'created' if created else 'found'}")  # Debug log
+
+            # Get or create user profile
+            profile, created = Profile.objects.get_or_create(
+                user=request.user,
+                defaults={
+                    'first_name': '',
+                    'last_name': '',
+                    'contact_number': '',
+                    'address': ''
+                }
+            )
+            print(f"User profile {'created' if created else 'found'}")  # Debug log
+            
+            data = {
+                'username': request.user.username,
+                'email': request.user.email,
+                'department': faculty.department,
+                'first_name': profile.first_name or '',
+                'last_name': profile.last_name or '',
+                'contact_number': profile.contact_number or '',
+                'address': profile.address or '',
+            }
+            
+            return Response(data)
+            
+        except Exception as e:
+            print(f"Error in FacultyProfileView: {str(e)}")  # Debug log
+            import traceback
+            print(traceback.format_exc())  # Print full traceback
+            return Response(
+                {"detail": f"Error retrieving faculty profile: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def put(self, request):
+        try:
+            # Get or create faculty profile
+            faculty, created = Faculty.objects.get_or_create(
+                user=request.user,
+                defaults={'department': 'General'}
+            )
+            
+            # Get or create user profile
+            profile, created = Profile.objects.get_or_create(
+                user=request.user
+            )
+            
+            # Update profile fields
+            if 'first_name' in request.data:
+                profile.first_name = request.data['first_name']
+            if 'last_name' in request.data:
+                profile.last_name = request.data['last_name']
+            if 'contact_number' in request.data:
+                profile.contact_number = request.data['contact_number']
+            if 'address' in request.data:
+                profile.address = request.data['address']
+            
+            profile.save()
+            
+            # Update faculty-specific fields
+            if 'department' in request.data:
+                faculty.department = request.data['department']
+                faculty.save()
+            
+            return Response({
+                'username': request.user.username,
+                'email': request.user.email,
+                'department': faculty.department,
+                'first_name': profile.first_name,
+                'last_name': profile.last_name,
+                'contact_number': profile.contact_number,
+                'address': profile.address,
+            })
+            
+        except Exception as e:
+            print(f"Error updating faculty profile: {str(e)}")  # Debug log
+            return Response(
+                {"detail": "Error updating faculty profile"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class StudentListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get students associated with the faculty
+        students = Student.objects.filter(faculty=request.user.faculty)
+        serializer = StudentSerializer(students, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = StudentSerializer(data=request.data)
+        if serializer.is_valid():
+            # Automatically assign the faculty
+            serializer.save(faculty=request.user.faculty)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class StudentDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk, faculty):
+        try:
+            return Student.objects.get(pk=pk, faculty=faculty)
+        except Student.DoesNotExist:
+            raise Http404
+
+    def get(self, request, pk):
+        student = self.get_object(pk, request.user.faculty)
+        serializer = StudentSerializer(student)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        student = self.get_object(pk, request.user.faculty)
+        serializer = StudentSerializer(student, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        student = self.get_object(pk, request.user.faculty)
+        student.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class CustomTokenRefreshView(TokenRefreshView):
+    def post(self, request, *args, **kwargs):
+        print("Refresh token request received:", request.data)  # Debug log
+        
+        try:
+            response = super().post(request, *args, **kwargs)
+            print("Token refresh successful")  # Debug log
+            return response
+            
+        except Exception as e:
+            print(f"Token refresh error: {str(e)}")  # Debug log
+            return Response(
+                {"detail": "Invalid refresh token"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def debug_users(request):
+    users = User.objects.all()
+    data = []
+    for user in users:
+        data.append({
+            'username': user.username,
+            'groups': [g.name for g in user.groups.all()],
+            'is_active': user.is_active,
+            'has_usable_password': user.has_usable_password(),
+        })
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def debug_create_user(request):
+    try:
+        username = request.data.get('username')
+        password = request.data.get('password')
+        role = request.data.get('role', 'student')
+
+        user = User.objects.create_user(username=username, password=password)
+        group, _ = Group.objects.get_or_create(name=role)
+        user.groups.add(group)
+
+        return Response({
+            'status': 'success',
+            'username': username,
+            'role': role
+        })
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=400)

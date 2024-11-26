@@ -111,3 +111,20 @@ class ProfileSerializer(serializers.ModelSerializer):
                 pass
                 
         return data
+
+class StudentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Student
+        fields = ['id', 'first_name', 'last_name', 'email', 'roll_number', 
+                 'department', 'faculty', 'created_at', 'updated_at']
+        read_only_fields = ['faculty', 'created_at', 'updated_at']
+
+    def validate_email(self, value):
+        if Student.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A student with this email already exists.")
+        return value
+
+    def validate_roll_number(self, value):
+        if Student.objects.filter(roll_number=value).exists():
+            raise serializers.ValidationError("A student with this roll number already exists.")
+        return value

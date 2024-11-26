@@ -1,14 +1,38 @@
 import { useState, useEffect } from "react";
-import api from "../api";
+import { updateProfile } from "../api";
 import Avatar from '../components/Avatar';
+import api from "../api";
+
+const styles = {
+    dashboardHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '20px',
+        backgroundColor: '#f5f5f5',
+        borderRadius: '8px',
+        marginBottom: '20px'
+    },
+    userInfo: {
+        flex: 1
+    },
+    profilePicture: {
+        marginLeft: '20px'
+    },
+    infoText: {
+        margin: '5px 0',
+        color: '#666'
+    }
+};
 
 function StudentHome() {
-    const [profile, setProfile] = useState({});
+    const [profile, setProfile] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({});
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState("");
+    const [selectedImage, setSelectedImage] = useState(null);
 
     useEffect(() => {
         fetchProfile();
@@ -64,40 +88,42 @@ function StudentHome() {
 
     const handleFormSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
+        setError(null);
+
         try {
-            setLoading(true);
-            setError(null);
-            setSuccessMessage("");
-    
-            const formDataToSend = new FormData();
-            
-            // Append all form fields
-            Object.keys(formData).forEach(key => {
-                if (formData[key] !== null && formData[key] !== undefined) {
-                    // Special handling for profile picture
-                    if (key === 'profile_picture') {
-                        if (formData[key] instanceof File) {
-                            formDataToSend.append(key, formData[key]);
-                        }
-                    } else {
-                        formDataToSend.append(key, formData[key]);
-                    }
+            const formData = new FormData();
+            formData.append('first_name', e.target.first_name.value);
+            formData.append('last_name', e.target.last_name.value);
+            formData.append('contact_number', e.target.contact_number.value);
+            formData.append('address', e.target.address.value);
+            formData.append('gender', e.target.gender.value);
+            formData.append('blood_group', e.target.blood_group.value);
+            formData.append('dob', e.target.dob.value);
+
+            if (e.target.profile_picture.files[0]) {
+                formData.append('profile_picture', e.target.profile_picture.files[0]);
+            }
+
+            const response = await api.put('/api/student/profile/', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
                 }
             });
-    
-            const res = await api.put("/api/profile/", formDataToSend);
+
+            setProfile(response.data);
+            alert('Profile updated successfully!');
             
-            setProfile(res.data);
-            setEditMode(false);
-            setSuccessMessage("Profile updated successfully!");
-            window.alert("Profile updated successfully!");
+            if (response.data.profile_picture) {
+                const timestamp = new Date().getTime();
+                setProfile({
+                    ...response.data,
+                    profile_picture: `${response.data.profile_picture}?t=${timestamp}`
+                });
+            }
         } catch (err) {
-            console.error("Update error details:", err);
-            const errorMessage = err.response?.data?.error || 
-                                 err.response?.data?.message || 
-                                 "Error updating profile. Please try again.";
-            setError(errorMessage);
-            window.alert(errorMessage);
+            console.error('Update error details:', err);
+            setError('Failed to update profile');
         } finally {
             setLoading(false);
         }
@@ -113,20 +139,27 @@ function StudentHome() {
             
             {profile && (
                 <div className="profile-card">
-                    <div className="profile-info">
-                        <div className="avatar-container">
-                            <Avatar 
-                                src={profile.profile_picture}
-                                alt={`${profile.first_name || 'Student'}'s profile`}
-                            />
+                    <div style={styles.dashboardHeader}>
+                        <div style={styles.userInfo}>
+                            <h2>{profile.first_name} {profile.last_name}</h2>
+                            <p style={styles.infoText}>Email: {profile.email || 'Not provided'}</p>
+                            <p style={styles.infoText}>Contact: {profile.contact_number || 'Not provided'}</p>
                         </div>
-                        <div className="profile-details">
-                            <h2 className="heading-2">Student Profile</h2>
-                            <div className="info-grid">
-                                <p><strong>Name:</strong> {profile.first_name} {profile.last_name}</p>
-                                <p><strong>Email:</strong> {profile.email}</p>
-                                <p><strong>Contact:</strong> {profile.contact_number}</p>
-                            </div>
+                        <div style={styles.profilePicture}>
+                            {profile.profile_picture && (
+                                <img
+                                    src={selectedImage || profile.profile_picture}
+                                    alt="Profile"
+                                    style={{
+                                        width: '150px',
+                                        height: '150px',
+                                        objectFit: 'cover',
+                                        borderRadius: '50%',
+                                        border: '3px solid #fff',
+                                        boxShadow: '0 0 10px rgba(0,0,0,0.1)'
+                                    }}
+                                />
+                            )}
                         </div>
                     </div>
                     {!editMode ? (
@@ -146,7 +179,7 @@ function StudentHome() {
                             </button>
                         </div>
                     ) : (
-                        <form onSubmit={handleFormSubmit} className="form-container">
+                        <form onSubmit={handleFormSubmit} encType="multipart/form-data" className="form-container">
                             <h2 className="form-title">Edit Profile</h2>
                             <div className="form-fields">
                                 <div className="form-group">
@@ -154,10 +187,11 @@ function StudentHome() {
                                     <input
                                         type="file"
                                         name="profile_picture"
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            profile_picture: e.target.files[0]
-                                        }))}
+                                        onChange={(e) => {
+                                            if (e.target.files[0]) {
+                                                setSelectedImage(URL.createObjectURL(e.target.files[0]));
+                                            }
+                                        }}
                                         className="form-input"
                                         accept="image/*"
                                     />
@@ -242,7 +276,7 @@ function StudentHome() {
                                         className="form-button"
                                         disabled={loading}
                                     >
-                                        {loading ? "Saving..." : "Save"}
+                                        {loading ? "Updating..." : "Update Profile"}
                                     </button>
                                     <button 
                                         type="button" 
@@ -258,6 +292,7 @@ function StudentHome() {
                     )}
                 </div>
             )}
+            {error && <div className="error">{error}</div>}
         </div>
     );
 }

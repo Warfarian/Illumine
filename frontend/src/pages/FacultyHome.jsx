@@ -2,28 +2,28 @@ import { useState, useEffect } from "react";
 import api from "../api";
 import Avatar from '../components/Avatar';
 import '../styles/pages/dashboard.css';
+import { getFacultyProfile } from '../api';
+import { Link } from "react-router-dom";
 
 function FacultyHome() {
     const [facultyProfile, setFacultyProfile] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [students, setStudents] = useState([]);
 
     useEffect(() => {
-        fetchFacultyProfile();
-    }, []);
+        const loadProfile = async () => {
+            try {
+                const response = await getFacultyProfile();
+                setFacultyProfile(response.data);
+            } catch (err) {
+                console.error('Error loading faculty profile:', err);
+                setError('Failed to load profile');
+            }
+        };
 
-    const fetchFacultyProfile = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get("/api/faculty/profile/");
-            setFacultyProfile(response.data);
-        } catch (err) {
-            setError("Failed to load profile");
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        loadProfile();
+    }, []);
 
     const handleImageUpload = async (event) => {
         const file = event.target.files[0];
@@ -39,10 +39,9 @@ function FacultyHome() {
                     'Content-Type': 'multipart/form-data',
                 }
             });
-            setFacultyProfile(response.data);
+            fetchStudents();
         } catch (err) {
-            setError("Failed to upload image");
-            console.error(err);
+            alert(err.response?.data?.message || "Error adding student");
         } finally {
             setLoading(false);
         }
@@ -91,6 +90,35 @@ function FacultyHome() {
                     </div>
                 </div>
             )}
+
+            <div className="dashboard-actions">
+                <Link to="/faculty/create-student" className="button primary">
+                    Create New Student
+                </Link>
+            </div>
+
+            <div className="students-section">
+                <h2 className="heading-2">My Students</h2>
+                <div className="students-grid">
+                    {students.map((student) => (
+                        <div key={student.id} className="student-card">
+                            <div className="student-info">
+                                <h3>{student.first_name} {student.last_name}</h3>
+                                <p>Roll Number: {student.roll_number}</p>
+                                <p>Email: {student.email}</p>
+                            </div>
+                            <div className="student-actions">
+                                <Link 
+                                    to={`/faculty/edit-student/${student.id}`} 
+                                    className="button secondary"
+                                >
+                                    Edit
+                                </Link>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
