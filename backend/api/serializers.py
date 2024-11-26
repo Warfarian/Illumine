@@ -32,29 +32,76 @@ class SubjectSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'faculty']
 
 class StudentSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    profile_picture = serializers.ImageField(required=False, allow_null=True)
-    subjects = SubjectSerializer(many=True, read_only=True)
+    username = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True)
     
     class Meta:
         model = Student
-        fields = ['id', 'user', 'profile_picture', 'first_name', 'last_name', 
-                 'dob', 'gender', 'blood_group', 'contact_number', 'address', 
-                 'faculty', 'subjects']
+        fields = [
+            'id',
+            'username',
+            'password',
+            'first_name',
+            'last_name',
+            'email',
+            'department',
+            'gender',
+            'blood_group',
+            'contact_number',
+            'address'
+        ]
 
-    def update(self, instance, validated_data):
-        profile_picture = validated_data.pop('profile_picture', None)
-        if profile_picture:
-            # Delete old profile picture if it exists
-            if instance.profile_picture:
-                instance.profile_picture.delete(save=False)
-            instance.profile_picture = profile_picture
+    def create(self, validated_data):
+        print("Starting create method with data:", validated_data)  # Debug print
+        
+        try:
+            # Extract user-specific data
+            username = validated_data.pop('username')
+            password = validated_data.pop('password')
+            email = validated_data.get('email')
             
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+            print(f"Creating user with username: {username}, email: {email}")  # Debug print
+
+            # Create User instance first
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=validated_data.get('first_name', ''),
+                last_name=validated_data.get('last_name', '')
+            )
             
-        instance.save()
-        return instance
+            print(f"User created with ID: {user.id}")  # Debug print
+
+            # Add to student group
+            student_group, _ = Group.objects.get_or_create(name='student')
+            user.groups.add(student_group)
+            
+            print("Creating student with data:", validated_data)  # Debug print
+            
+            # Create Student instance with the user
+            student = Student.objects.create(
+                user=user,
+                first_name=validated_data.get('first_name'),
+                last_name=validated_data.get('last_name'),
+                email=validated_data.get('email'),
+                department=validated_data.get('department'),
+                gender=validated_data.get('gender'),
+                blood_group=validated_data.get('blood_group'),
+                contact_number=validated_data.get('contact_number'),
+                address=validated_data.get('address')
+            )
+            
+            print(f"Student created with ID: {student.id}")  # Debug print
+            return student
+            
+        except Exception as e:
+            print(f"Error in create method: {str(e)}")  # Debug print
+            # If student creation fails, delete the user to avoid orphaned users
+            if 'user' in locals():
+                print(f"Deleting user due to error")  # Debug print
+                user.delete()
+            raise serializers.ValidationError(str(e))
 
 class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
@@ -113,25 +160,20 @@ class ProfileSerializer(serializers.ModelSerializer):
         return data
 
 class StudentSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()  
+    
     class Meta:
         model = Student
         fields = [
-            'id', 
-            'first_name', 
-            'last_name', 
-            'email', 
-            'department', 
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'department',
             'roll_number',
-            'subjects'
         ]
-        read_only_fields = ['roll_number']  # This will be auto-generated
+        read_only_fields = ['roll_number']
 
-    def validate_email(self, value):
-        if Student.objects.filter(email=value).exists():
-            raise serializers.ValidationError("A student with this email already exists.")
-        return value
-
-    def validate_roll_number(self, value):
-        if Student.objects.filter(roll_number=value).exists():
-            raise serializers.ValidationError("A student with this roll number already exists.")
-        return value
+    def get_username(self, obj):
+        return obj.user.username if obj.user else ''

@@ -65,27 +65,59 @@ function FacultyHome() {
         }
     };
 
-    const handleCreateStudent = async (_, formData) => {
+    const handleCreateStudent = async (formData) => {
         try {
-            await api.post('/api/faculty/students/', formData);
-            fetchStudents();
-            setShowModal(false);
-            alert('Student created successfully');
-        } catch (err) {
-            console.error('Error creating student:', err);
-            alert(err.response?.data?.detail || 'Failed to create student');
+            console.log('Creating student with data:', formData); // Debug log
+            
+            const response = await api.post('/api/faculty/students/', {
+                username: formData.username,
+                password: formData.password,
+                first_name: formData.first_name,
+                last_name: formData.last_name,
+                email: formData.email,
+                department: formData.department,
+                gender: formData.gender || '',
+                blood_group: formData.blood_group || '',
+                contact_number: formData.contact_number || '',
+                address: formData.address || ''
+            }); 
+
+            if (response.data) {
+                await fetchStudents();
+                setShowModal(false);
+                alert('Student created successfully');
+            }
+        } catch (error) {
+            console.error('Error creating student:', error);
+            console.error('Error response:', error.response?.data);
+            const errorMessage = error.response?.data?.detail || 
+                               error.message ||
+                               'Failed to create student';
+            alert(errorMessage);
         }
     };
 
     const handleUpdateStudent = async (studentId, formData) => {
         try {
-            await api.put(`/api/faculty/students/${studentId}/`, formData);
-            fetchStudents();
-            setShowModal(false);
-            alert('Student updated successfully');
-        } catch (err) {
-            console.error('Error updating student:', err);
-            alert(err.response?.data?.detail || 'Failed to update student');
+            console.log('Updating student:', studentId, 'with data:', formData); // Debug log
+            
+            const response = await api.put(`/api/faculty/students/${studentId}/`, {
+                first_name: formData.first_name,
+                last_name: formData.last_name,
+                email: formData.email,
+                department: formData.department
+            });
+
+            if (response.data) {
+                console.log('Update successful:', response.data);
+                await fetchStudents();
+                setShowModal(false);
+                alert('Student updated successfully');
+            }
+        } catch (error) {
+            console.error('Error updating student:', error);
+            console.error('Error response:', error.response?.data);
+            alert('Failed to update student');
         }
     };
 
@@ -196,7 +228,9 @@ function FacultyHome() {
             {showModal && (
                 <StudentFormModal
                     student={selectedStudent}
-                    onSubmit={selectedStudent ? handleUpdateStudent : handleCreateStudent}
+                    onSubmit={selectedStudent ? 
+                        (formData) => handleUpdateStudent(selectedStudent.id, formData) : 
+                        handleCreateStudent}
                     onClose={() => {
                         setShowModal(false);
                         setSelectedStudent(null);

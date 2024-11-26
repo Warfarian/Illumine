@@ -675,7 +675,14 @@ class StudentManagementView(APIView):
 
     def get(self, request):
         try:
-            students = Student.objects.all()
+            # Get the department from query params or faculty's department
+            department = request.query_params.get('department')
+            
+            if department:
+                students = Student.objects.filter(department=department)
+            else:
+                students = Student.objects.all()
+                
             serializer = StudentSerializer(students, many=True)
             return Response(serializer.data)
         except Exception as e:
@@ -687,35 +694,83 @@ class StudentManagementView(APIView):
 
     def post(self, request):
         try:
-            # Create user first
-            user_data = {
-                'username': request.data.get('username'),
-                'password': request.data.get('password'),
-                'email': request.data.get('email')
-            }
-            user = User.objects.create_user(**user_data)
-            
-            # Add to student group
-            student_group = Group.objects.get(name='student')
+            print("Creating student with data:", request.data)
+
+            # First create the user
+            user = User.objects.create_user(
+                username=request.data['username'],
+                password=request.data['password'],
+                email=request.data['email'],
+                first_name=request.data['first_name'],
+                last_name=request.data['last_name']
+            )
+
+            # Add user to student group
+            student_group, _ = Group.objects.get_or_create(name='student')
             user.groups.add(student_group)
-            
-            # Create student profile
-            student_data = {
-                'user': user,
-                'first_name': request.data.get('first_name'),
-                'last_name': request.data.get('last_name'),
-                'email': request.data.get('email'),
-                'department': request.data.get('department')
-            }
-            
-            serializer = StudentSerializer(data=student_data)
-            if serializer.is_valid():
-                student = serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
+
+            # Create the student with only the fields that exist in your model
+            student = Student.objects.create(
+                user=user,
+                first_name=request.data['first_name'],
+                last_name=request.data['last_name'],
+                email=request.data['email'],
+                department=request.data['department']
+            )
+
+            # Return the created student data
+            return Response({
+                'id': student.id,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'email': student.email,
+                'department': student.department
+            }, status=status.HTTP_201_CREATED)
+
         except Exception as e:
             print(f"Error creating student: {str(e)}")
+            # If there was an error and user was created, delete it
+            if 'user' in locals():
+                user.delete()
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def put(self, request, pk):
+        try:
+            print("Updating student with data:", request.data)  # Debug print
+            student = Student.objects.get(pk=pk)
+            
+            # Update student fields
+            student.first_name = request.data.get('first_name', student.first_name)
+            student.last_name = request.data.get('last_name', student.last_name)
+            student.email = request.data.get('email', student.email)
+            student.department = request.data.get('department', student.department)
+            student.save()
+            
+            # Update associated user
+            if student.user:
+                student.user.first_name = student.first_name
+                student.user.last_name = student.last_name
+                student.user.email = student.email
+                student.user.save()
+
+            return Response({
+                'id': student.id,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'email': student.email,
+                'department': student.department
+            })
+
+        except Student.DoesNotExist:
+            return Response(
+                {"detail": "Student not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"Error updating student: {str(e)}")  # Debug print
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
