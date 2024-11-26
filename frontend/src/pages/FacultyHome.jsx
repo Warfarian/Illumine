@@ -1,124 +1,197 @@
-import { useState, useEffect } from "react";
-import api from "../api";
-import Avatar from '../components/Avatar';
-import '../styles/pages/dashboard.css';
-import { getFacultyProfile } from '../api';
-import { Link } from "react-router-dom";
+import { useState, useEffect } from 'react';
+import api from '../api';
+import StudentFormModal from '../components/StudentFormModal';
+import '../styles/components/FacultyHome.css';
 
 function FacultyHome() {
-    const [facultyProfile, setFacultyProfile] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [profile, setProfile] = useState(null);
     const [students, setStudents] = useState([]);
+    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+    const [assignedSubject, setAssignedSubject] = useState(null);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        const loadProfile = async () => {
-            try {
-                const response = await getFacultyProfile();
-                setFacultyProfile(response.data);
-            } catch (err) {
-                console.error('Error loading faculty profile:', err);
-                setError('Failed to load profile');
-            }
-        };
-
-        loadProfile();
+        fetchProfile();
+        fetchStudents();
+        fetchAssignedSubject();
     }, []);
 
-    const handleImageUpload = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('profile_picture', file);
-
+    const fetchProfile = async () => {
         try {
-            setLoading(true);
-            const response = await api.patch("/api/faculty/profile/", formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                }
-            });
-            fetchStudents();
+            const response = await api.get('/api/faculty/profile/');
+            setProfile(response.data);
         } catch (err) {
-            alert(err.response?.data?.message || "Error adding student");
-        } finally {
-            setLoading(false);
+            console.error('Error fetching profile:', err);
+            if (err.response?.status === 401) {
+                // Handle unauthorized access
+                window.location.href = '/login';
+            }
         }
     };
 
-    if (loading) return <div className="dashboard">Loading...</div>;
-    if (error) return <div className="dashboard error-message">{error}</div>;
+    const fetchStudents = async () => {
+        try {
+            const response = await api.get('/api/faculty/students/');
+            setStudents(response.data);
+            setError(null); // Clear any existing errors on successful fetch
+        } catch (err) {
+            console.error('Error fetching students:', err);
+            setError('Unable to load students. Please try again later.');
+        }
+    };
+
+    const fetchAssignedSubject = async () => {
+        try {
+            const response = await api.get('/api/faculty/subject/');
+            setAssignedSubject(response.data);
+        } catch (err) {
+            if (err.response?.status === 404) {
+                console.log('No subject assigned');
+            } else {
+                console.error('Error fetching assigned subject:', err);
+            }
+        }
+    };
+
+    const handleCreateStudent = async (_, formData) => {
+        try {
+            await api.post('/api/faculty/students/', formData);
+            fetchStudents();
+            setShowModal(false);
+            alert('Student created successfully');
+        } catch (err) {
+            console.error('Error creating student:', err);
+            alert(err.response?.data?.detail || 'Failed to create student');
+        }
+    };
+
+    const handleUpdateStudent = async (studentId, formData) => {
+        try {
+            await api.put(`/api/faculty/students/${studentId}/`, formData);
+            fetchStudents();
+            setShowModal(false);
+            alert('Student updated successfully');
+        } catch (err) {
+            console.error('Error updating student:', err);
+            alert(err.response?.data?.detail || 'Failed to update student');
+        }
+    };
 
     return (
-        <div className="dashboard">
-            <div className="dashboard-header">
-                <h1 className="heading-1">Faculty Dashboard</h1>
-            </div>
-
-            {facultyProfile && (
-                <div className="profile-card">
-                    <div className="profile-info">
-                        <Avatar 
-                            src={facultyProfile.profile_picture}
-                            alt={`${facultyProfile.first_name}'s profile`}
-                            onUpload={handleImageUpload}
-                        />
-                        <div className="profile-details">
-                            <h2 className="heading-2">Profile Information</h2>
-                            <div className="info-grid">
-                                <div className="info-item">
-                                    <span className="info-label">Name</span>
-                                    <span className="info-value">
-                                        {facultyProfile.first_name} {facultyProfile.last_name}
-                                    </span>
-                                </div>
-                                <div className="info-item">
-                                    <span className="info-label">Department</span>
-                                    <span className="info-value">{facultyProfile.department}</span>
-                                </div>
-                                <div className="info-item">
-                                    <span className="info-label">Email</span>
-                                    <span className="info-value">{facultyProfile.email}</span>
-                                </div>
-                                <div className="info-item">
-                                    <span className="info-label">Contact</span>
-                                    <span className="info-value">{facultyProfile.contact_number}</span>
-                                </div>
-                            </div>
+        <div className="faculty-home">
+            {/* Profile Section */}
+            {profile && (
+                <div className="header">
+                    <div className="header-content">
+                        <div className="profile-info">
+                            <h2>Welcome, {profile.first_name} {profile.last_name}</h2>
+                            <p>Department: {profile.department}</p>
                         </div>
+                        <button 
+                            className="add-button"
+                            onClick={() => {
+                                setSelectedStudent(null);
+                                setShowModal(true);
+                            }}
+                        >
+                            Add New Student
+                        </button>
                     </div>
                 </div>
             )}
 
-            <div className="dashboard-actions">
-                <Link to="/faculty/create-student" className="button primary">
-                    Create New Student
-                </Link>
+            {/* Assigned Subject Section */}
+            <div className="section">
+                <h3>Assigned Subject</h3>
+                {assignedSubject ? (
+                    <div className="subject-info">
+                        <h4>{assignedSubject.code} - {assignedSubject.name}</h4>
+                        <p>{assignedSubject.description}</p>
+                        <p>Credits: {assignedSubject.credits}</p>
+                        
+                        {assignedSubject.students && assignedSubject.students.length > 0 && (
+                            <div className="subject-students">
+                                <h5>Enrolled Students</h5>
+                                <ul>
+                                    {assignedSubject.students.map(student => (
+                                        <li key={student.id}>
+                                            {student.name} ({student.roll_number})
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <p>No subject assigned yet</p>
+                )}
             </div>
 
-            <div className="students-section">
-                <h2 className="heading-2">My Students</h2>
-                <div className="students-grid">
-                    {students.map((student) => (
-                        <div key={student.id} className="student-card">
-                            <div className="student-info">
-                                <h3>{student.first_name} {student.last_name}</h3>
-                                <p>Roll Number: {student.roll_number}</p>
-                                <p>Email: {student.email}</p>
-                            </div>
-                            <div className="student-actions">
-                                <Link 
-                                    to={`/faculty/edit-student/${student.id}`} 
-                                    className="button secondary"
-                                >
-                                    Edit
-                                </Link>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+            {/* Students Section */}
+            <div className="section">
+                <h3>Students</h3>
+                {error ? (
+                    <div className="error-message">
+                        <p>{error}</p>
+                        <button 
+                            className="action-button"
+                            onClick={fetchStudents}
+                            style={{marginTop: '10px'}}
+                        >
+                            Retry
+                        </button>
+                    </div>
+                ) : (
+                    <div className="table-container">
+                        <table className="faculty-table">
+                            <thead>
+                                <tr>
+                                    <th>Roll Number</th>
+                                    <th>Name</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Department</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {students.map(student => (
+                                    <tr key={student.id}>
+                                        <td>{student.roll_number}</td>
+                                        <td>{`${student.first_name} ${student.last_name}`}</td>
+                                        <td>{student.username}</td>
+                                        <td>{student.email}</td>
+                                        <td>{student.department}</td>
+                                        <td>
+                                            <button 
+                                                className="action-button"
+                                                onClick={() => {
+                                                    setSelectedStudent(student);
+                                                    setShowModal(true);
+                                                }}
+                                            >
+                                                Edit
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
+
+            {showModal && (
+                <StudentFormModal
+                    student={selectedStudent}
+                    onSubmit={selectedStudent ? handleUpdateStudent : handleCreateStudent}
+                    onClose={() => {
+                        setShowModal(false);
+                        setSelectedStudent(null);
+                    }}
+                />
+            )}
         </div>
     );
 }

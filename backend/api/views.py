@@ -18,6 +18,10 @@ from django.http import Http404
 from rest_framework.decorators import api_view, permission_classes
 from django.conf import settings
 import os
+import logging
+from rest_framework.authtoken.models import Token
+
+logger = logging.getLogger(__name__)
 
 class RegisterSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=['student', 'faculty'], write_only=True)
@@ -81,27 +85,105 @@ class ProfileSerializer(serializers.ModelSerializer):
         return data
 
 class RegisterView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = []
 
-    def post(self, request, *args, **kwargs):
-        serializer = RegisterSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            user = serializer.save()
+    def post(self, request):
+        try:
+            logger.info(f"Registration attempt with data: {request.data}")  # Debug log
+
+            # Validate required fields
+            required_fields = ['username', 'password', 'email', 'first_name', 'last_name', 'department', 'role']
+            missing_fields = [field for field in required_fields if not request.data.get(field)]
             
-            Profile.objects.get_or_create(user=user)
-            
-            refresh = RefreshToken.for_user(user)
-            role = user.groups.first().name if user.groups.exists() else None
+            if missing_fields:
+                return Response(
+                    {
+                        "detail": f"Missing required fields: {', '.join(missing_fields)}",
+                        "received_data": request.data
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate role
+            role = request.data['role'].lower()
+            if role not in ['student', 'faculty']:
+                return Response(
+                    {"detail": "Invalid role. Must be either 'student' or 'faculty'"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if username exists
+            if User.objects.filter(username=request.data['username']).exists():
+                return Response(
+                    {"detail": "Username already exists"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if email exists
+            if User.objects.filter(email=request.data['email']).exists():
+                return Response(
+                    {"detail": "Email already exists"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create user
+            user = User.objects.create_user(
+                username=request.data['username'],
+                email=request.data['email'],
+                password=request.data['password'],
+                first_name=request.data['first_name'],
+                last_name=request.data['last_name']
+            )
+
+            # Get or create groups
+            student_group, _ = Group.objects.get_or_create(name='student')
+            faculty_group, _ = Group.objects.get_or_create(name='faculty')
+
+            if role == 'student':
+                # Create student profile
+                student = Student.objects.create(
+                    user=user,
+                    first_name=request.data['first_name'],
+                    last_name=request.data['last_name'],
+                    email=request.data['email'],
+                    department=request.data['department']
+                )
+                # Add to student group
+                student_group = Group.objects.get(name='student')
+                student_group.user_set.add(user)
+                
+                # Assign subjects based on department
+                student.assign_department_subjects()
+
+            elif role == 'faculty':
+                # Create faculty profile
+                Faculty.objects.create(
+                    user=user,
+                    first_name=request.data['first_name'],
+                    last_name=request.data['last_name'],
+                    email=request.data['email'],
+                    department=request.data['department']
+                )
+                # Add to faculty group
+                faculty_group = Group.objects.get(name='faculty')
+                faculty_group.user_set.add(user)
+
+            # Generate token
+            token, _ = Token.objects.get_or_create(user=user)
 
             return Response({
-                'access': str(refresh.access_token),
-                'refresh': str(refresh),
+                'token': token.key,
+                'user_id': user.id,
                 'role': role
-            }, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+            })
+
+        except Exception as e:
+            print(f"Registration error: {str(e)}")  # Debug log
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class LoginView(TokenObtainPairView):
     permission_classes = [AllowAny]
 
@@ -238,9 +320,15 @@ class InitializeDefaultSubjectsView(APIView):
         return Response({"message": "Default subjects initialized successfully"}, status=200)
 
 class StudentListView(generics.ListAPIView):
-    queryset = Student.objects.all()
     serializer_class = StudentSerializer
-    permission_classes = [IsFaculty] 
+    permission_classes = [IsFaculty]
+
+    def get_queryset(self):
+        # Get students for the current faculty's subject
+        faculty = self.request.user.faculty
+        if faculty.subject:
+            return Student.objects.filter(subjects=faculty.subject)
+        return Student.objects.none()
 
 class FacultyStudentAssignmentView(generics.UpdateAPIView):
     queryset = Student.objects.all()
@@ -248,10 +336,25 @@ class FacultyStudentAssignmentView(generics.UpdateAPIView):
     permission_classes = [IsFaculty]
 
     def update(self, request, *args, **kwargs):
-        student = self.get_object()
-        student.faculty = request.user.faculty  
-        student.save()
-        return Response(StudentSerializer(student).data)
+        try:
+            student = self.get_object()
+            faculty = request.user.faculty
+            
+            if not faculty.subject:
+                return Response(
+                    {"detail": "No subject assigned to faculty"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Add the faculty's subject to student's subjects
+            student.subjects.add(faculty.subject)
+            
+            return Response(StudentSerializer(student).data)
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class StudentProfileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -407,46 +510,18 @@ class FacultyProfileView(APIView):
 
     def get(self, request):
         try:
-            print(f"Attempting to get profile for user: {request.user.username}")  # Debug log
-            
-            # Get or create faculty profile
-            faculty, created = Faculty.objects.get_or_create(
-                user=request.user,
-                defaults={'department': 'Computer Science'}  # Set a default department
-            )
-            print(f"Faculty profile {'created' if created else 'found'}")  # Debug log
-
-            # Get or create user profile
-            profile, created = Profile.objects.get_or_create(
-                user=request.user,
-                defaults={
-                    'first_name': '',
-                    'last_name': '',
-                    'contact_number': '',
-                    'address': ''
-                }
-            )
-            print(f"User profile {'created' if created else 'found'}")  # Debug log
-            
-            data = {
-                'username': request.user.username,
-                'email': request.user.email,
-                'department': faculty.department,
-                'first_name': profile.first_name or '',
-                'last_name': profile.last_name or '',
-                'contact_number': profile.contact_number or '',
-                'address': profile.address or '',
-            }
-            
-            return Response(data)
-            
-        except Exception as e:
-            print(f"Error in FacultyProfileView: {str(e)}")  # Debug log
-            import traceback
-            print(traceback.format_exc())  # Print full traceback
+            faculty = Faculty.objects.get(user=request.user)
+            return Response({
+                'id': faculty.id,
+                'first_name': faculty.first_name,
+                'last_name': faculty.last_name,
+                'email': faculty.email,
+                'department': faculty.department
+            })
+        except Faculty.DoesNotExist:
             return Response(
-                {"detail": f"Error retrieving faculty profile: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"detail": "Faculty profile not found"},
+                status=status.HTTP_404_NOT_FOUND
             )
 
     def put(self, request):
@@ -592,3 +667,293 @@ def debug_create_user(request):
             'status': 'error',
             'message': str(e)
         }, status=400)
+
+class FacultyDashboardView(APIView):
+    permission_classes = [IsAuthenticated, IsFaculty]
+
+    def get(self, request):
+        try:
+            faculty = request.user.faculty
+            students = Student.objects.all()
+            subjects = Subject.objects.filter(faculty=faculty)
+
+            data = {
+                'faculty_info': {
+                    'name': f"{faculty.user.profile.first_name} {faculty.user.profile.last_name}",
+                    'department': faculty.department,
+                    'email': faculty.user.email,
+                },
+                'subjects': [{
+                    'code': subject.code,
+                    'name': subject.name,
+                    'students_count': subject.students.count()
+                } for subject in subjects],
+                'students': [{
+                    'id': student.id,
+                    'name': f"{student.first_name} {student.last_name}",
+                    'roll_number': student.roll_number,
+                    'email': student.email
+                } for student in students]
+            }
+            return Response(data)
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class StudentManagementView(APIView):
+    permission_classes = [IsAuthenticated, IsFaculty]
+
+    def get(self, request):
+        """Get all students"""
+        try:
+            students = Student.objects.all()
+            data = [{
+                'id': student.id,
+                'username': student.user.username,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'email': student.email,
+                'department': student.department,
+                'roll_number': student.roll_number
+            } for student in students]
+            return Response(data)
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def post(self, request):
+        """Create new student"""
+        try:
+            # Validate required fields
+            required_fields = ['username', 'email', 'password', 'first_name', 'last_name']
+            missing_fields = [field for field in required_fields if not request.data.get(field)]
+            
+            if missing_fields:
+                return Response(
+                    {
+                        "detail": f"Missing required fields: {', '.join(missing_fields)}",
+                        "received_data": request.data
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if username already exists
+            if User.objects.filter(username=request.data['username']).exists():
+                return Response(
+                    {"detail": "This username is already taken"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if email already exists
+            if User.objects.filter(email=request.data['email']).exists():
+                return Response(
+                    {"detail": "A user with this email already exists"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create user account
+            try:
+                user = User.objects.create_user(
+                    username=request.data['username'],
+                    email=request.data['email'],
+                    password=request.data['password']
+                )
+            except Exception as e:
+                return Response(
+                    {"detail": f"Error creating user: {str(e)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Add to student group
+            try:
+                student_group = Group.objects.get(name='student')
+                student_group.user_set.add(user)
+            except Group.DoesNotExist:
+                user.delete()
+                return Response(
+                    {"detail": "Student group not found. Please contact administrator."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            # Create student profile
+            try:
+                student = Student.objects.create(
+                    user=user,
+                    first_name=request.data['first_name'],
+                    last_name=request.data['last_name'],
+                    email=request.data['email'],
+                    department=request.data.get('department', 'Computer Science')
+                    # roll_number will be auto-generated in the save method
+                )
+            except Exception as e:
+                user.delete()
+                return Response(
+                    {"detail": f"Error creating student profile: {str(e)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create profile
+            try:
+                Profile.objects.create(
+                    user=user,
+                    first_name=request.data['first_name'],
+                    last_name=request.data['last_name']
+                )
+            except Exception as e:
+                student.delete()
+                user.delete()
+                return Response(
+                    {"detail": f"Error creating user profile: {str(e)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            return Response({
+                'message': 'Student created successfully',
+                'student_id': student.id,
+                'student_data': {
+                    'first_name': student.first_name,
+                    'last_name': student.last_name,
+                    'email': student.email,
+                    'department': student.department,
+                    'roll_number': student.roll_number
+                }
+            })
+
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            return Response(
+                {"detail": f"An unexpected error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def put(self, request, student_id):
+        """Update student details"""
+        try:
+            student = Student.objects.get(id=student_id)
+            user = student.user
+            profile = user.profile
+
+            # Update user email if changed
+            if 'email' in request.data and request.data['email'] != user.email:
+                # Check if email is already taken
+                if User.objects.filter(email=request.data['email']).exclude(id=user.id).exists():
+                    return Response(
+                        {"detail": "Email already exists"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                user.email = request.data['email']
+                user.username = request.data['email']  # Update username to match email
+                user.save()
+
+            # Update student fields
+            student.first_name = request.data.get('first_name', student.first_name)
+            student.last_name = request.data.get('last_name', student.last_name)
+            student.email = request.data.get('email', student.email)
+            student.department = request.data.get('department', student.department)
+            student.save()
+
+            # Update profile fields
+            profile.first_name = request.data.get('first_name', profile.first_name)
+            profile.last_name = request.data.get('last_name', profile.last_name)
+            profile.save()
+
+            return Response({
+                'id': student.id,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'email': student.email,
+                'department': student.department
+            })
+        except Student.DoesNotExist:
+            return Response(
+                {"detail": "Student not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"Error updating student: {str(e)}")  # Debug log
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class SubjectListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        subjects = Subject.objects.all()
+        data = [{
+            'code': subject.code,
+            'name': subject.name,
+            'description': subject.description,
+            'credits': subject.credits,
+            'faculty': {
+                'first_name': subject.faculty.first_name,
+                'last_name': subject.faculty.last_name
+            } if subject.faculty else None
+        } for subject in subjects]
+        return Response(data)
+
+class FacultySubjectView(APIView):
+    permission_classes = [IsAuthenticated, IsFaculty]
+
+    def get(self, request):
+        try:
+            faculty = Faculty.objects.get(user=request.user)
+            if not faculty.subject:
+                return Response(
+                    {"detail": "No subject assigned yet"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+                
+            return Response({
+                'code': faculty.subject.code,
+                'name': faculty.subject.name,
+                'description': faculty.subject.description,
+                'credits': faculty.subject.credits,
+                'students': [{
+                    'id': student.id,
+                    'name': f"{student.first_name} {student.last_name}",
+                    'roll_number': student.roll_number
+                } for student in faculty.subject.students.all()]
+            })
+        except Faculty.DoesNotExist:
+            return Response(
+                {"detail": "Faculty profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class StudentSubjectsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            student = Student.objects.get(user=request.user)
+            subjects = student.subjects.all().select_related('assigned_faculty')  
+            
+            data = [{
+                'code': subject.code,
+                'name': subject.name,
+                'description': subject.description,
+                'credits': subject.credits,
+                'faculty': {
+                    'first_name': subject.assigned_faculty.first_name,
+                    'last_name': subject.assigned_faculty.last_name,
+                    'email': subject.assigned_faculty.email
+                } if subject.assigned_faculty else None
+            } for subject in subjects]
+            
+            return Response(data)
+        except Student.DoesNotExist:
+            return Response(
+                {"detail": "Student profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )

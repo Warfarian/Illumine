@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { updateProfile } from "../api";
 import Avatar from '../components/Avatar';
 import api from "../api";
+import '../styles/pages/StudentHome.css';
 
 const styles = {
     dashboardHeader: {
@@ -33,9 +34,11 @@ function StudentHome() {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState("");
     const [selectedImage, setSelectedImage] = useState(null);
+    const [subjects, setSubjects] = useState([]);
 
     useEffect(() => {
         fetchProfile();
+        fetchSubjects();
     }, []);
 
     const fetchProfile = async () => {
@@ -66,6 +69,17 @@ function StudentHome() {
             setError(err.response?.data?.error || "Error loading profile data");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchSubjects = async () => {
+        try {
+            const response = await api.get('/api/student/subjects/');
+            console.log('Fetched subjects:', response.data);
+            setSubjects(response.data);
+        } catch (err) {
+            setError('Failed to load subjects');
+            console.error('Subject fetch error:', err);
         }
     };
 
@@ -173,7 +187,7 @@ function StudentHome() {
                             <p><strong>Address:</strong> {profile.address || "Not provided"}</p>
                             <button 
                                 onClick={handleEditToggle}
-                                className="btn btn-primary"
+                                className="edit-button"
                             >
                                 Edit Details
                             </button>
@@ -293,6 +307,35 @@ function StudentHome() {
                 </div>
             )}
             {error && <div className="error">{error}</div>}
+            <div className="subjects-section">
+                <h3>Subjects</h3>
+                <div className="subjects-grid">
+                    {subjects.map(subject => (
+                        <div key={subject.code} className="subject-card">
+                            <div className="subject-header">
+                                <h4>{subject.code}</h4>
+                                <span className="credits">Credits: {subject.credits}</span>
+                            </div>
+                            <h5>{subject.name}</h5>
+                            <p className="description">{subject.description}</p>
+                            {subject.faculty ? (
+                                <div className="faculty-info">
+                                    <p className="faculty-name">
+                                        <strong>Faculty:</strong> Prof. {subject.faculty.first_name} {subject.faculty.last_name}
+                                    </p>
+                                    {subject.faculty.email && (
+                                        <p className="faculty-email">
+                                            <strong>Contact:</strong> {subject.faculty.email}
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="no-faculty">Faculty not assigned</p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }

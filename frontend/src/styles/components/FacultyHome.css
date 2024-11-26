@@ -1,0 +1,191 @@
+.faculty-home {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: #f5f5f5;
+    min-height: 100vh;
+}
+
+.header {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.title {
+    margin: 0;
+    color: #333;
+    font-size: 24px;
+}
+
+.add-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.3s;
+}
+
+.add-button:hover {
+    background-color: #45a049;
+}
+
+.section {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section-title {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 20px;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+.faculty-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.faculty-table th {
+    background-color: #f8f9fa;
+    color: #333;
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.faculty-table tr {
+    border-bottom: 1px solid #dee2e6;
+    transition: background-color 0.3s;
+}
+
+.faculty-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.faculty-table td {
+    padding: 12px 15px;
+    color: #555;
+    vertical-align: middle;
+}
+
+.action-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.action-button:hover {
+    background-color: #0056b3;
+}
+
+.faculty-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.add-button:hover {
+    background-color: #45a049;
+}
+
+.action-button:hover {
+    background-color: #0056b3;
+}
+
+.faculty-table td, 
+.faculty-table th {
+    padding: 12px 15px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.faculty-table td:first-child,
+.faculty-table th:first-child {
+    font-family: monospace;  
+    min-width: 100px;
+}
+
+.subject-info {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-top: 15px;
+}
+
+.subject-info h4 {
+    color: #333;
+    margin: 0 0 10px 0;
+}
+
+.subject-students {
+    margin-top: 20px;
+}
+
+.subject-students h5 {
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.subject-students ul {
+    list-style: none;
+    padding: 0;
+}
+
+.subject-students li {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.subject-students li:last-child {
+    border-bottom: none;
+}
+
+.error-message {
+    color: #dc3545;
+    padding: 10px;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.profile-info {
+    margin-bottom: 20px;
+}
+
+.profile-info h2 {
+    margin: 0;
+    color: #333;
+}
+
+.profile-info p {
+    margin: 5px 0 0;
+    color: #666;
+}
