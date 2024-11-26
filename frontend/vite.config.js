@@ -6,4 +6,13 @@ export default defineConfig({
   plugins: [react()],
   base: '/',
   assetsInclude: ['**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.svg'],
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
 })
