@@ -307,74 +307,41 @@ class StudentProfileView(APIView):
 
     def get(self, request):
         try:
-            profile = Profile.objects.get(user=request.user)
             student = Student.objects.get(user=request.user)
-            
-            data = {
-                'first_name': profile.first_name,
-                'last_name': profile.last_name,
-                'email': student.email,
-                'contact_number': profile.contact_number,
-                'address': profile.address,
-                'profile_picture': request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None,
-                'gender': profile.gender,
-                'dob': profile.dob,
-                'blood_group': profile.blood_group,
-                'roll_number': student.roll_number,
-                'department': student.department
-            }
-            return Response(data)
-        except Exception as e:
-            print(f"Error getting profile: {str(e)}")
+            serializer = StudentSerializer(student, context={'request': request})
+            return Response(serializer.data)
+        except Student.DoesNotExist:
             return Response(
-                {"detail": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"detail": "Student not found"},
+                status=status.HTTP_404_NOT_FOUND
             )
 
     def put(self, request):
         try:
-            profile = Profile.objects.get(user=request.user)
             student = Student.objects.get(user=request.user)
-
-            # Handle profile picture
-            if 'profile_picture' in request.FILES:
-                profile.profile_picture = request.FILES['profile_picture']
-
-            # Update profile fields
-            profile.first_name = request.data.get('first_name', profile.first_name)
-            profile.last_name = request.data.get('last_name', profile.last_name)
-            profile.contact_number = request.data.get('contact_number', profile.contact_number)
-            profile.address = request.data.get('address', profile.address)
-            profile.gender = request.data.get('gender', profile.gender)
-            profile.blood_group = request.data.get('blood_group', profile.blood_group)
             
-            # Handle date of birth
-            dob = request.data.get('dob')
-            if dob:
-                profile.dob = dob
+            # Handle file upload
+            if 'profile_picture' in request.FILES:
+                student.profile_picture = request.FILES['profile_picture']
 
-            profile.save()
+            # Update other fields
+            for field in ['contact_number', 'address', 'gender', 'blood_group', 'dob']:
+                if field in request.data:
+                    setattr(student, field, request.data[field] or '')
 
-            # Update student fields
-            student.first_name = request.data.get('first_name', student.first_name)
-            student.last_name = request.data.get('last_name', student.last_name)
             student.save()
 
-            return Response({
-                'first_name': profile.first_name,
-                'last_name': profile.last_name,
-                'email': student.email,
-                'contact_number': profile.contact_number,
-                'address': profile.address,
-                'profile_picture': request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None,
-                'gender': profile.gender,
-                'dob': profile.dob,
-                'blood_group': profile.blood_group,
-                'roll_number': student.roll_number,
-                'department': student.department
-            })
+            # Return fresh data using serializer
+            serializer = StudentSerializer(student, context={'request': request})
+            return Response(serializer.data)
+
+        except Student.DoesNotExist:
+            return Response(
+                {"detail": "Student not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
-            print(f"Error updating profile: {str(e)}")
+            print(f"Error updating student: {str(e)}")
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

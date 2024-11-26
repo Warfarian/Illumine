@@ -34,6 +34,7 @@ class SubjectSerializer(serializers.ModelSerializer):
 class StudentSerializer(serializers.ModelSerializer):
     username = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True)
+    profile_picture = serializers.SerializerMethodField()
     
     class Meta:
         model = Student
@@ -48,7 +49,8 @@ class StudentSerializer(serializers.ModelSerializer):
             'gender',
             'blood_group',
             'contact_number',
-            'address'
+            'address',
+            'profile_picture'
         ]
 
     def create(self, validated_data):
@@ -102,6 +104,14 @@ class StudentSerializer(serializers.ModelSerializer):
                 print(f"Deleting user due to error")  # Debug print
                 user.delete()
             raise serializers.ValidationError(str(e))
+
+    def get_profile_picture(self, obj):
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
 
 class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
@@ -172,8 +182,27 @@ class StudentSerializer(serializers.ModelSerializer):
             'email',
             'department',
             'roll_number',
-        ]
+            'contact_number',
+            'address',
+            'gender',
+            'blood_group',
+            'dob',
+            'profile_picture'
+        ]        
         read_only_fields = ['roll_number']
+
+    def get_profile_picture(self, obj):
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['profile_picture'] = self.get_profile_picture(instance)
+        return data
 
     def get_username(self, obj):
         return obj.user.username if obj.user else ''

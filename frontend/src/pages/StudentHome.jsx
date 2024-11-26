@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { updateProfile } from "../api";
 import Avatar from '../components/Avatar';
 import api from "../api";
@@ -17,7 +17,7 @@ const styles = {
     userInfo: {
         flex: 1
     },
-    profilePicture: {
+    profilePicture: {   
         marginLeft: '20px'
     },
     infoText: {
@@ -30,58 +30,37 @@ function StudentHome() {
     const [profile, setProfile] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({});
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState("");
     const [selectedImage, setSelectedImage] = useState(null);
     const [subjects, setSubjects] = useState([]);
 
-    useEffect(() => {
-        fetchProfile();
-        fetchSubjects();
-    }, []);
-
-    const fetchProfile = async () => {
+    // Use useCallback to memoize the fetch function
+    const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            setError(null);
-            
-            console.log('Fetching profile...');
-            
-            // Get student profile data
-            const profileRes = await api.get("/api/student/profile/");  // Changed endpoint
-            console.log('Profile response:', profileRes.data);
-            
+            const [profileRes, subjectsRes] = await Promise.all([
+                api.get("/api/student/profile/"),
+                api.get('/api/student/subjects/')
+            ]);
+
             setProfile(profileRes.data);
-            setFormData({
-                first_name: profileRes.data.first_name || '',
-                last_name: profileRes.data.last_name || '',
-                email: profileRes.data.email || '',  
-                dob: profileRes.data.dob || '',
-                gender: profileRes.data.gender || '',
-                blood_group: profileRes.data.blood_group || '',
-                contact_number: profileRes.data.contact_number || '',
-                address: profileRes.data.address || '',
-                profile_picture: profileRes.data.profile_picture || null
-            });
+            setFormData(profileRes.data);
+            setSubjects(subjectsRes.data);
+            setError(null);
         } catch (err) {
-            console.error("Error fetching profile:", err);
-            setError(err.response?.data?.error || "Error loading profile data");
+            console.error("Error fetching data:", err);
+            setError(err.response?.data?.error || "Error loading data");
         } finally {
             setLoading(false);
         }
-    };
+    }, []); // Empty dependency array since this doesn't depend on any props or state
 
-    const fetchSubjects = async () => {
-        try {
-            const response = await api.get('/api/student/subjects/');
-            console.log('Fetched subjects:', response.data);
-            setSubjects(response.data);
-        } catch (err) {
-            setError('Failed to load subjects');
-            console.error('Subject fetch error:', err);
-        }
-    };
+    // Single useEffect for initial data fetch
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     const handleEditToggle = () => {
         setEditMode(!editMode);
@@ -108,15 +87,14 @@ function StudentHome() {
         try {
             const formDataToSend = new FormData();
             
-            formDataToSend.append('first_name', formData.first_name || '');
-            formDataToSend.append('last_name', formData.last_name || '');
-            formDataToSend.append('email', formData.email || '');
-            formDataToSend.append('contact_number', formData.contact_number || '');
-            formDataToSend.append('address', formData.address || '');
-            formDataToSend.append('gender', formData.gender || '');
-            formDataToSend.append('blood_group', formData.blood_group || '');
-            formDataToSend.append('dob', formData.dob || '');
+            // Append all fields, even if empty
+            Object.keys(formData).forEach(key => {
+                if (key !== 'profile_picture') {  // Handle profile picture separately
+                    formDataToSend.append(key, formData[key] || '');
+                }
+            });
 
+            // Handle profile picture
             const fileInput = e.target.querySelector('input[type="file"]');
             if (fileInput && fileInput.files[0]) {
                 formDataToSend.append('profile_picture', fileInput.files[0]);
@@ -128,29 +106,27 @@ function StudentHome() {
                 }
             });
 
+            // Update state with response data
             setProfile(response.data);
-            alert('Profile updated successfully!');
-            
-            if (response.data.profile_picture) {
-                const timestamp = new Date().getTime();
-                setProfile({
-                    ...response.data,
-                    profile_picture: `${response.data.profile_picture}?t=${timestamp}`
-                });
-            }
-            
+            setFormData(response.data);
             setEditMode(false);
+            setSelectedImage(null);
             
         } catch (err) {
-            console.error('Update error details:', err);
-            setError('Failed to update profile');
+            console.error('Update error:', err);
+            setError(err.response?.data?.detail || 'Failed to update profile');
         } finally {
             setLoading(false);
         }
     };
 
+    // Render function
     if (loading) {
         return <div className="loading">Loading...</div>;
+    }
+
+    if (error) {
+        return <div className="error">{error}</div>;
     }
 
     return (
@@ -166,20 +142,21 @@ function StudentHome() {
                             <p style={styles.infoText}>Contact: {profile.contact_number || 'Not provided'}</p>
                         </div>
                         <div style={styles.profilePicture}>
-                            {profile.profile_picture && (
-                                <img
-                                    src={selectedImage || profile.profile_picture}
-                                    alt="Profile"
-                                    style={{
-                                        width: '150px',
-                                        height: '150px',
-                                        objectFit: 'cover',
-                                        borderRadius: '50%',
-                                        border: '3px solid #fff',
-                                        boxShadow: '0 0 10px rgba(0,0,0,0.1)'
-                                    }}
-                                />
-                            )}
+                            <img
+                                src={profile.profile_picture || '/default-avatar.png'}
+                                alt="Profile"
+                                style={{
+                                    width: '150px',
+                                    height: '150px',
+                                    objectFit: 'cover',
+                                    borderRadius: '50%',
+                                    border: '3px solid #fff',
+                                    boxShadow: '0 0 10px rgba(0,0,0,0.1)'
+                                }}
+                                onError={(e) => {
+                                    e.target.src = '/default-avatar.png';
+                                }}
+                            />
                         </div>
                     </div>
                     {!editMode ? (
@@ -312,7 +289,6 @@ function StudentHome() {
                     )}
                 </div>
             )}
-            {error && <div className="error">{error}</div>}
             <div className="subjects-section">
                 <h3>Subjects</h3>
                 <div className="subjects-grid">

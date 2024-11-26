@@ -39,6 +39,12 @@ class Student(models.Model):
         ('Software Engineering', 'Software Engineering'),
     ]
 
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other')
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -46,6 +52,14 @@ class Student(models.Model):
     department = models.CharField(max_length=100, choices=DEPARTMENT_CHOICES, default='Computer Science')
     roll_number = models.CharField(max_length=20, unique=True)
     subjects = models.ManyToManyField('Subject', related_name='students')
+    
+    # Add these new fields
+    contact_number = models.CharField(max_length=15, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
+    blood_group = models.CharField(max_length=5, blank=True, null=True)
+    dob = models.DateField(null=True, blank=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
 
     def assign_department_subjects(self):
         """Assign subjects based on department"""
