@@ -675,16 +675,28 @@ class StudentManagementView(APIView):
 
     def get(self, request):
         try:
-            # Get the department from query params or faculty's department
-            department = request.query_params.get('department')
+            # Get the faculty member
+            faculty = Faculty.objects.get(user=request.user)
+            print(f"Faculty: {faculty.first_name} {faculty.last_name}")  # Debug log
+            print(f"Faculty Department: {faculty.department}")  # Debug log
+            print(f"Faculty Subject: {faculty.subject}")  # Debug log
+
+            # Get students who match both department and subject
+            students = Student.objects.filter(
+                department=faculty.department,
+                subjects=faculty.subject
+            ).distinct()
             
-            if department:
-                students = Student.objects.filter(department=department)
-            else:
-                students = Student.objects.all()
-                
+            print(f"Found {students.count()} students")  # Debug log
+            
             serializer = StudentSerializer(students, many=True)
             return Response(serializer.data)
+            
+        except Faculty.DoesNotExist:
+            return Response(
+                {"detail": "Faculty profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
             print(f"Error fetching students: {str(e)}")
             return Response(

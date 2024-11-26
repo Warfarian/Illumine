@@ -26,37 +26,17 @@ function Register() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
-        setIsLoading(true);
-
+        
         try {
-            console.log('Sending registration data:', formData); // Debug log
-
             const response = await api.post('/api/register/', formData);
-            console.log('Registration response:', response.data); // Debug log
-
-            if (response.data.token) {
-                localStorage.setItem('token', response.data.token);
-                localStorage.setItem('role', response.data.role);
-                localStorage.setItem('username', response.data.username);
-
-                // Redirect based on role
-                if (response.data.role === 'student') {
-                    navigate('/student');
-                } else if (response.data.role === 'faculty') {
-                    navigate('/faculty');
-                }
-            } else {
-                setError('Registration successful but no token received');
+            
+            if (response.data) {
+                alert('Registration successful! Please login.');
+                navigate('/login');  // Redirect to login page
             }
-        } catch (err) {
-            console.error('Registration error:', err);
-            setError(
-                err.response?.data?.detail || 
-                'Registration failed. Please try again.'
-            );
-        } finally {
-            setIsLoading(false);
+        } catch (error) {
+            console.error('Registration error:', error);
+            alert(error.response?.data?.detail || 'Registration failed');
         }
     };
 

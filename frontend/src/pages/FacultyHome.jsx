@@ -11,12 +11,24 @@ function FacultyHome() {
     const [showModal, setShowModal] = useState(false);
     const [assignedSubject, setAssignedSubject] = useState(null);
     const [error, setError] = useState(null);
+    const [facultyDepartment, setFacultyDepartment] = useState('');
+    const [enrolledStudents, setEnrolledStudents] = useState([]);
 
     useEffect(() => {
         fetchProfile();
         fetchStudents();
         fetchAssignedSubject();
+        getFacultyProfile();
     }, []);
+
+    const getFacultyProfile = async () => {
+        try {
+            const response = await api.get('/api/faculty/profile/');
+            setFacultyDepartment(response.data.department);
+        } catch (error) {
+            console.error('Error fetching faculty profile:', error);
+        }
+    };
 
     const fetchProfile = async () => {
         try {
@@ -39,17 +51,22 @@ function FacultyHome() {
 
     const fetchStudents = async () => {
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await axios.get('http://localhost:8000/api/faculty/students/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
+            const response = await api.get('/api/faculty/students/', {
+                params: {
+                    department: facultyDepartment
                 }
             });
             setStudents(response.data);
         } catch (error) {
-            console.error('Error fetching students:', error.response?.data);
+            console.error('Error fetching students:', error);
         }
     };
+
+    useEffect(() => {
+        if (facultyDepartment) {
+            fetchStudents();
+        }
+    }, [facultyDepartment]);
 
     const fetchAssignedSubject = async () => {
         try {
@@ -62,6 +79,19 @@ function FacultyHome() {
             setAssignedSubject(response.data);
         } catch (error) {
             console.error('Error fetching assigned subject:', error.response?.data);
+        }
+    };
+
+    const fetchEnrolledStudents = async () => {
+        try {
+            const response = await api.get('/api/faculty/students/', {
+                params: {
+                    department: facultyDepartment
+                }
+            });
+            setEnrolledStudents(response.data);
+        } catch (error) {
+            console.error('Error fetching enrolled students:', error);
         }
     };
 
@@ -99,7 +129,7 @@ function FacultyHome() {
 
     const handleUpdateStudent = async (studentId, formData) => {
         try {
-            console.log('Updating student:', studentId, 'with data:', formData); // Debug log
+            console.log('Updating student:', studentId, 'with data:', formData);
             
             const response = await api.put(`/api/faculty/students/${studentId}/`, {
                 first_name: formData.first_name,
@@ -109,8 +139,8 @@ function FacultyHome() {
             });
 
             if (response.data) {
-                console.log('Update successful:', response.data);
                 await fetchStudents();
+                await fetchEnrolledStudents();
                 setShowModal(false);
                 alert('Student updated successfully');
             }
