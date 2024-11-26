@@ -115,9 +115,16 @@ class ProfileSerializer(serializers.ModelSerializer):
 class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
-        fields = ['id', 'first_name', 'last_name', 'email', 'roll_number', 
-                 'department', 'faculty', 'created_at', 'updated_at']
-        read_only_fields = ['faculty', 'created_at', 'updated_at']
+        fields = [
+            'id', 
+            'first_name', 
+            'last_name', 
+            'email', 
+            'department', 
+            'roll_number',
+            'subjects'
+        ]
+        read_only_fields = ['roll_number']  # This will be auto-generated
 
     def validate_email(self, value):
         if Student.objects.filter(email=value).exists():

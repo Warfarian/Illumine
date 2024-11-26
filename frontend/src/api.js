@@ -64,9 +64,10 @@ const handleApiError = (error) => {
 // Request interceptor
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('accessToken');
         if (token) {
-            config.headers.Authorization = `Token ${token}`;
+            config.headers.Authorization = `Bearer ${token}`;
+            console.log('Request headers:', config.headers);
         }
         return config;
     },

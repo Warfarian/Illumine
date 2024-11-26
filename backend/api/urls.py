@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
-from .views import LoginView, RegisterView, UserProfileView, CustomTokenRefreshView, StudentProfileView, StudentManagementView, SubjectListView, FacultySubjectView, StudentSubjectsView, FacultyProfileView
+from .views import LoginView, RegisterView, UserProfileView, CustomTokenRefreshView, StudentProfileView, StudentManagementView, SubjectListView, FacultySubjectView, StudentSubjectsView, FacultyProfileView, faculty_subject_view
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -27,8 +27,10 @@ urlpatterns = [
     path('api/debug/create-user/', views.debug_create_user, name='debug_create_user'),
     path('api/student/profile/', StudentProfileView.as_view(), name='student-profile'),
     path('api/faculty/students/', StudentManagementView.as_view(), name='faculty-students'),
-    path('api/faculty/students/<int:student_id>/', StudentManagementView.as_view(), name='student-detail'),
+    path('api/faculty/students/<int:pk>/', StudentManagementView.as_view(), name='faculty-student-detail'),
     path('api/subjects/', SubjectListView.as_view(), name='subject-list'),
     path('api/faculty/subject/', FacultySubjectView.as_view(), name='faculty-subject'),
     path('api/student/subjects/', StudentSubjectsView.as_view(), name='student-subjects'),
+    path('faculty/subject/', faculty_subject_view, name='faculty-subject'),
+    path('api/faculty/students/<int:student_id>/', views.faculty_student_detail_view, name='faculty-student-detail'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

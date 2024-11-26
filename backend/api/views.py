@@ -188,52 +188,19 @@ class LoginView(TokenObtainPairView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        print("Login attempt received:", request.data)  # Debug log
+        print("Login attempt for username:", request.data.get('username'))
+        response = super().post(request, *args, **kwargs)
         
-        try:
-            username = request.data.get('username')
-            password = request.data.get('password')
-
-            if not username or not password:
-                return Response(
-                    {"detail": "Both username and password are required"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Check if user exists
-            try:
-                user = User.objects.get(username=username)
-                print(f"User found: {user.username}")
-                print(f"Groups: {[g.name for g in user.groups.all()]}")
-            except User.DoesNotExist:
-                print(f"No user found with username: {username}")
-                return Response(
-                    {"detail": "No account found with this username"},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-
-            # Attempt to get the token pair
-            response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            user = User.objects.get(username=request.data.get('username'))
+            print(f"Login successful for {user.username}")
+            print(f"User groups: {[g.name for g in user.groups.all()]}")
             
-            # If we get here, authentication was successful
-            role = None
-            if user.groups.filter(name__iexact='student').exists():
-                role = 'student'
-            elif user.groups.filter(name__iexact='faculty').exists():
-                role = 'faculty'
-
+            # Add role to response
+            role = 'faculty' if user.groups.filter(name='faculty').exists() else 'student'
             response.data['role'] = role
-            print("Login successful:", response.data)
             
-            return response
-            
-        except Exception as e:
-            print(f"Login error: {str(e)}")
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
+        return response
 
 class CreateStudentView(generics.CreateAPIView):
     queryset = Student.objects.all()
@@ -506,9 +473,10 @@ class UserProfileView(APIView):
             return Response({"error": str(e)}, status=500)
 
 class FacultyProfileView(APIView):
-    permission_classes = [IsAuthenticated, IsFaculty]
-
     def get(self, request):
+        # Add print statement for debugging
+        print("User:", request.user)
+        print("User groups:", request.user.groups.all())
         try:
             faculty = Faculty.objects.get(user=request.user)
             return Response({
@@ -706,175 +674,48 @@ class StudentManagementView(APIView):
     permission_classes = [IsAuthenticated, IsFaculty]
 
     def get(self, request):
-        """Get all students"""
         try:
             students = Student.objects.all()
-            data = [{
-                'id': student.id,
-                'username': student.user.username,
-                'first_name': student.first_name,
-                'last_name': student.last_name,
-                'email': student.email,
-                'department': student.department,
-                'roll_number': student.roll_number
-            } for student in students]
-            return Response(data)
+            serializer = StudentSerializer(students, many=True)
+            return Response(serializer.data)
         except Exception as e:
+            print(f"Error fetching students: {str(e)}")
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     def post(self, request):
-        """Create new student"""
         try:
-            # Validate required fields
-            required_fields = ['username', 'email', 'password', 'first_name', 'last_name']
-            missing_fields = [field for field in required_fields if not request.data.get(field)]
+            # Create user first
+            user_data = {
+                'username': request.data.get('username'),
+                'password': request.data.get('password'),
+                'email': request.data.get('email')
+            }
+            user = User.objects.create_user(**user_data)
             
-            if missing_fields:
-                return Response(
-                    {
-                        "detail": f"Missing required fields: {', '.join(missing_fields)}",
-                        "received_data": request.data
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Check if username already exists
-            if User.objects.filter(username=request.data['username']).exists():
-                return Response(
-                    {"detail": "This username is already taken"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Check if email already exists
-            if User.objects.filter(email=request.data['email']).exists():
-                return Response(
-                    {"detail": "A user with this email already exists"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Create user account
-            try:
-                user = User.objects.create_user(
-                    username=request.data['username'],
-                    email=request.data['email'],
-                    password=request.data['password']
-                )
-            except Exception as e:
-                return Response(
-                    {"detail": f"Error creating user: {str(e)}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
             # Add to student group
-            try:
-                student_group = Group.objects.get(name='student')
-                student_group.user_set.add(user)
-            except Group.DoesNotExist:
-                user.delete()
-                return Response(
-                    {"detail": "Student group not found. Please contact administrator."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-
+            student_group = Group.objects.get(name='student')
+            user.groups.add(student_group)
+            
             # Create student profile
-            try:
-                student = Student.objects.create(
-                    user=user,
-                    first_name=request.data['first_name'],
-                    last_name=request.data['last_name'],
-                    email=request.data['email'],
-                    department=request.data.get('department', 'Computer Science')
-                    # roll_number will be auto-generated in the save method
-                )
-            except Exception as e:
-                user.delete()
-                return Response(
-                    {"detail": f"Error creating student profile: {str(e)}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Create profile
-            try:
-                Profile.objects.create(
-                    user=user,
-                    first_name=request.data['first_name'],
-                    last_name=request.data['last_name']
-                )
-            except Exception as e:
-                student.delete()
-                user.delete()
-                return Response(
-                    {"detail": f"Error creating user profile: {str(e)}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            return Response({
-                'message': 'Student created successfully',
-                'student_id': student.id,
-                'student_data': {
-                    'first_name': student.first_name,
-                    'last_name': student.last_name,
-                    'email': student.email,
-                    'department': student.department,
-                    'roll_number': student.roll_number
-                }
-            })
-
+            student_data = {
+                'user': user,
+                'first_name': request.data.get('first_name'),
+                'last_name': request.data.get('last_name'),
+                'email': request.data.get('email'),
+                'department': request.data.get('department')
+            }
+            
+            serializer = StudentSerializer(data=student_data)
+            if serializer.is_valid():
+                student = serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
         except Exception as e:
-            print(f"Unexpected error: {str(e)}")
-            return Response(
-                {"detail": f"An unexpected error occurred: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    def put(self, request, student_id):
-        """Update student details"""
-        try:
-            student = Student.objects.get(id=student_id)
-            user = student.user
-            profile = user.profile
-
-            # Update user email if changed
-            if 'email' in request.data and request.data['email'] != user.email:
-                # Check if email is already taken
-                if User.objects.filter(email=request.data['email']).exclude(id=user.id).exists():
-                    return Response(
-                        {"detail": "Email already exists"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                user.email = request.data['email']
-                user.username = request.data['email']  # Update username to match email
-                user.save()
-
-            # Update student fields
-            student.first_name = request.data.get('first_name', student.first_name)
-            student.last_name = request.data.get('last_name', student.last_name)
-            student.email = request.data.get('email', student.email)
-            student.department = request.data.get('department', student.department)
-            student.save()
-
-            # Update profile fields
-            profile.first_name = request.data.get('first_name', profile.first_name)
-            profile.last_name = request.data.get('last_name', profile.last_name)
-            profile.save()
-
-            return Response({
-                'id': student.id,
-                'first_name': student.first_name,
-                'last_name': student.last_name,
-                'email': student.email,
-                'department': student.department
-            })
-        except Student.DoesNotExist:
-            return Response(
-                {"detail": "Student not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            print(f"Error updating student: {str(e)}")  # Debug log
+            print(f"Error creating student: {str(e)}")
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -957,3 +798,153 @@ class StudentSubjectsView(APIView):
                 {"detail": "Student profile not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
+        
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])  # Remove IsFaculty temporarily for testing
+def faculty_subject_view(request):
+    # Debug prints
+    print("1. Authenticated User:", request.user.username)
+    print("2. User Groups:", [g.name for g in request.user.groups.all()])
+    print("3. Is User Authenticated?", request.user.is_authenticated)
+    
+    try:
+        faculty = Faculty.objects.get(user=request.user)
+        print("4. Found Faculty:", faculty)
+        
+        if not hasattr(faculty, 'subject'):
+            print("5. No subject attribute found")
+            return Response(
+                {"detail": "No subject assigned yet"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        if not faculty.subject:
+            print("6. Subject is None")
+            return Response(
+                {"detail": "No subject assigned yet"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        print("7. Faculty Subject:", faculty.subject)
+        
+        return Response({
+            'code': faculty.subject.code if faculty.subject else None,
+            'name': faculty.subject.name if faculty.subject else None,
+            'description': faculty.subject.description if faculty.subject else None,
+            'credits': faculty.subject.credits if faculty.subject else None
+        })
+        
+    except Faculty.DoesNotExist as e:
+        print("Error: Faculty does not exist -", str(e))
+        return Response(
+            {"detail": "Faculty profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        print("Unexpected error:", str(e))
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def faculty_students_view(request):
+    print("User:", request.user.username)
+    print("Groups:", [g.name for g in request.user.groups.all()])
+    
+    try:
+        faculty = Faculty.objects.get(user=request.user)
+        students = Student.objects.all()  # Or filter based on your requirements
+        
+        data = [{
+            'id': student.id,
+            'first_name': student.first_name,
+            'last_name': student.last_name,
+            'email': student.email,
+            'roll_number': student.roll_number,
+            'department': student.department
+        } for student in students]
+        
+        return Response(data)
+        
+    except Faculty.DoesNotExist:
+        return Response(
+            {"detail": "Faculty profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        print("Error:", str(e))
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def faculty_student_detail_view(request, student_id):
+    print(f"User: {request.user}, Method: {request.method}")  # Debug log
+    
+    try:
+        # Verify faculty
+        faculty = Faculty.objects.get(user=request.user)
+        student = Student.objects.get(id=student_id)
+
+        if request.method == 'GET':
+            data = {
+                'id': student.id,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'email': student.email,
+                'department': student.department,
+                'roll_number': student.roll_number
+            }
+            return Response(data)
+
+        elif request.method == 'PUT':
+            # Update student details
+            if 'first_name' in request.data:
+                student.first_name = request.data['first_name']
+            if 'last_name' in request.data:
+                student.last_name = request.data['last_name']
+            if 'email' in request.data:
+                student.email = request.data['email']
+            if 'department' in request.data:
+                student.department = request.data['department']
+            
+            student.save()
+            
+            # Update user profile if it exists
+            if hasattr(student.user, 'profile'):
+                profile = student.user.profile
+                if 'first_name' in request.data:
+                    profile.first_name = request.data['first_name']
+                if 'last_name' in request.data:
+                    profile.last_name = request.data['last_name']
+                profile.save()
+
+            return Response({
+                'id': student.id,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'email': student.email,
+                'department': student.department,
+                'roll_number': student.roll_number
+            })
+
+    except Faculty.DoesNotExist:
+        return Response(
+            {"detail": "Faculty profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Student.DoesNotExist:
+        return Response(
+            {"detail": "Student not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        print(f"Error: {str(e)}")  # Debug log
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

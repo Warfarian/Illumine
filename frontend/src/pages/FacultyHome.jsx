@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../api';
 import StudentFormModal from '../components/StudentFormModal';
 import '../styles/components/FacultyHome.css';
+import axios from 'axios';
 
 function FacultyHome() {
     const [profile, setProfile] = useState(null);
@@ -19,12 +20,18 @@ function FacultyHome() {
 
     const fetchProfile = async () => {
         try {
-            const response = await api.get('/api/faculty/profile/');
+            const token = localStorage.getItem('access_token');
+            console.log('Token used:', token);
+            
+            const response = await axios.get('http://localhost:8000/api/faculty/profile/', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             setProfile(response.data);
-        } catch (err) {
-            console.error('Error fetching profile:', err);
-            if (err.response?.status === 401) {
-                // Handle unauthorized access
+        } catch (error) {
+            console.error('Error fetching profile:', error.response?.data);
+            if (error.response?.status === 401) {
                 window.location.href = '/login';
             }
         }
@@ -32,25 +39,29 @@ function FacultyHome() {
 
     const fetchStudents = async () => {
         try {
-            const response = await api.get('/api/faculty/students/');
+            const token = localStorage.getItem('access_token');
+            const response = await axios.get('http://localhost:8000/api/faculty/students/', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             setStudents(response.data);
-            setError(null); // Clear any existing errors on successful fetch
-        } catch (err) {
-            console.error('Error fetching students:', err);
-            setError('Unable to load students. Please try again later.');
+        } catch (error) {
+            console.error('Error fetching students:', error.response?.data);
         }
     };
 
     const fetchAssignedSubject = async () => {
         try {
-            const response = await api.get('/api/faculty/subject/');
+            const token = localStorage.getItem('access_token');
+            const response = await axios.get('http://localhost:8000/api/faculty/subject/', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             setAssignedSubject(response.data);
-        } catch (err) {
-            if (err.response?.status === 404) {
-                console.log('No subject assigned');
-            } else {
-                console.error('Error fetching assigned subject:', err);
-            }
+        } catch (error) {
+            console.error('Error fetching assigned subject:', error.response?.data);
         }
     };
 

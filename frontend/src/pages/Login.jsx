@@ -2,6 +2,8 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import Form from "../components/Forms";
 import '../styles/styles.css';
+import axios from 'axios';
+import  api  from '../api';
 
 function Login() {
     const [error, setError] = useState(null);
@@ -42,6 +44,26 @@ function Login() {
         localStorage.removeItem('user_role');
 
         setError(error.response?.data?.detail || "Login failed. Please try again.");
+    };
+
+    const handleLogin = async (values) => {
+        try {
+            const response = await api.post('/api/token/', values);
+            console.log('Login response:', response.data); // Debug log
+            
+            // Store tokens
+            localStorage.setItem('accessToken', response.data.access);
+            localStorage.setItem('refreshToken', response.data.refresh);
+            localStorage.setItem('userRole', response.data.role);
+            
+            // Verify stored data
+            console.log('Stored tokens:', {
+                access: localStorage.getItem('accessToken'),
+                role: localStorage.getItem('userRole')
+            });
+        } catch (error) {
+            console.error('Login error:', error);
+        }
     };
 
     return (
