@@ -57,6 +57,7 @@ function StudentHome() {
             setFormData({
                 first_name: res.data.first_name || '',
                 last_name: res.data.last_name || '',
+                email: res.data.email || '',
                 dob: res.data.dob || '',
                 gender: res.data.gender || '',
                 blood_group: res.data.blood_group || '',
