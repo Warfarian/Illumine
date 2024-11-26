@@ -997,9 +997,12 @@ class PromoteToFacultyView(APIView):
 
     def post(self, request, student_id):
         try:
+            print(f"Starting promotion for student ID: {student_id}")  # Debug log
+            
             # Get the student
             student = Student.objects.get(pk=student_id)
             user = student.user
+            print(f"Found student: {student.first_name} {student.last_name}")  # Debug log
 
             # Create faculty instance
             faculty = Faculty.objects.create(
@@ -1009,10 +1012,25 @@ class PromoteToFacultyView(APIView):
                 email=student.email,
                 department=student.department
             )
+            print(f"Created faculty record with ID: {faculty.id}")  # Debug log
 
-            # Add to faculty group (keep student group for now)
+            # Add to faculty group
             faculty_group = Group.objects.get_or_create(name='faculty')[0]
             user.groups.add(faculty_group)
+            print("Added to faculty group")  # Debug log
+
+            # Remove student group
+            student_group = Group.objects.get(name='student')
+            user.groups.remove(student_group)
+            print("Removed from student group")  # Debug log
+
+            # Remove all subject enrollments
+            student.subjects.clear()
+            print("Cleared subject enrollments")  # Debug log
+            
+            # Delete the student record
+            student.delete()
+            print("Deleted student record")  # Debug log
 
             return Response({
                 'message': 'Successfully promoted to faculty',
@@ -1020,12 +1038,13 @@ class PromoteToFacultyView(APIView):
             })
 
         except Student.DoesNotExist:
+            print(f"Student {student_id} not found")  # Debug log
             return Response(
                 {'detail': 'Student not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            print(f"Error promoting student to faculty: {str(e)}")
+            print(f"Error promoting student to faculty: {str(e)}")  # Debug log
             return Response(
                 {'detail': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

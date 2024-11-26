@@ -154,9 +154,17 @@ function FacultyHome() {
     const handlePromoteToFaculty = async (student) => {
         if (window.confirm(`Are you sure you want to promote ${student.first_name} ${student.last_name} to faculty?`)) {
             try {
-                await api.post(`/api/faculty/promote-student/${student.id}/`);
+                console.log('Starting promotion for student:', student);  // Debug log
+                
+                const response = await api.post(`/api/faculty/promote-student/${student.id}/`);
+                console.log('Promotion response:', response.data);  // Debug log
+                
                 alert('Successfully promoted to faculty');
-                await fetchStudents(); // Refresh the list
+                
+                // Force refresh the students list
+                await fetchStudents();
+                console.log('Students list refreshed');  // Debug log
+                
             } catch (error) {
                 console.error('Error promoting to faculty:', error);
                 alert(error.response?.data?.detail || 'Failed to promote to faculty');
