@@ -151,6 +151,19 @@ function FacultyHome() {
         }
     };
 
+    const handlePromoteToFaculty = async (student) => {
+        if (window.confirm(`Are you sure you want to promote ${student.first_name} ${student.last_name} to faculty?`)) {
+            try {
+                await api.post(`/api/faculty/promote-student/${student.id}/`);
+                alert('Successfully promoted to faculty');
+                await fetchStudents(); // Refresh the list
+            } catch (error) {
+                console.error('Error promoting to faculty:', error);
+                alert(error.response?.data?.detail || 'Failed to promote to faculty');
+            }
+        }
+    };
+
     return (
         <div className="faculty-home">
             {/* Profile Section */}
@@ -245,6 +258,12 @@ function FacultyHome() {
                                                 }}
                                             >
                                                 Edit
+                                            </button>
+                                            <button 
+                                                onClick={() => handlePromoteToFaculty(student)}
+                                                className="promote-button"
+                                            >
+                                                Promote to Faculty
                                             </button>
                                         </td>
                                     </tr>

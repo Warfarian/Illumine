@@ -233,30 +233,6 @@ class CreateStudentView(generics.CreateAPIView):
         ])
         student.subjects.set(default_subjects)
 
-class PromoteToFacultyView(generics.UpdateAPIView):
-    queryset = Student.objects.all()
-    permission_classes = [IsFaculty]
-
-    def update(self, request, *args, **kwargs):
-        student = self.get_object()
-        user = student.user
-        
-        # Change group from student to faculty
-        student_group = Group.objects.get(name='student')
-        faculty_group = Group.objects.get(name='faculty')
-        user.groups.remove(student_group)
-        user.groups.add(faculty_group)
-        
-        # Create faculty profile
-        faculty = Faculty.objects.create(
-            user=user,
-            department="Computer Science"  # Default department
-        )
-        
-        # Delete student profile
-        student.delete()
-        
-        return Response({"message": "Successfully promoted to faculty"}, status=200)
 
 class InitializeDefaultSubjectsView(APIView):
     permission_classes = [IsFaculty]
@@ -1015,3 +991,42 @@ def faculty_student_detail_view(request, student_id):
             {"detail": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+class PromoteToFacultyView(APIView):
+    permission_classes = [IsAuthenticated, IsFaculty]
+
+    def post(self, request, student_id):
+        try:
+            # Get the student
+            student = Student.objects.get(pk=student_id)
+            user = student.user
+
+            # Create faculty instance
+            faculty = Faculty.objects.create(
+                user=user,
+                first_name=student.first_name,
+                last_name=student.last_name,
+                email=student.email,
+                department=student.department
+            )
+
+            # Add to faculty group (keep student group for now)
+            faculty_group = Group.objects.get_or_create(name='faculty')[0]
+            user.groups.add(faculty_group)
+
+            return Response({
+                'message': 'Successfully promoted to faculty',
+                'faculty_id': faculty.id
+            })
+
+        except Student.DoesNotExist:
+            return Response(
+                {'detail': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"Error promoting student to faculty: {str(e)}")
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

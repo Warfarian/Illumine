@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
-from .views import LoginView, RegisterView, UserProfileView, CustomTokenRefreshView, StudentProfileView, StudentManagementView, SubjectListView, FacultySubjectView, StudentSubjectsView, FacultyProfileView, faculty_subject_view
+from .views import LoginView, RegisterView, UserProfileView, CustomTokenRefreshView, StudentProfileView, StudentManagementView, SubjectListView, FacultySubjectView, StudentSubjectsView, FacultyProfileView, faculty_subject_view, PromoteToFacultyView
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -33,4 +33,5 @@ urlpatterns = [
     path('api/student/subjects/', StudentSubjectsView.as_view(), name='student-subjects'),
     path('faculty/subject/', faculty_subject_view, name='faculty-subject'),
     path('api/faculty/students/<int:student_id>/', views.faculty_student_detail_view, name='faculty-student-detail'),
+    path('api/faculty/promote-student/<int:student_id>/', PromoteToFacultyView.as_view(), name='promote-to-faculty'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
