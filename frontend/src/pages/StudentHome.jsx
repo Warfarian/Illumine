@@ -47,23 +47,22 @@ function StudentHome() {
             setError(null);
             
             console.log('Fetching profile...');
-            const token = localStorage.getItem('access_token');
-            console.log('Token exists:', !!token);
             
-            const res = await api.get("/api/profile/");
-            console.log('Profile response:', res.data);
+            // Get student profile data
+            const profileRes = await api.get("/api/student/profile/");  // Changed endpoint
+            console.log('Profile response:', profileRes.data);
             
-            setProfile(res.data);
+            setProfile(profileRes.data);
             setFormData({
-                first_name: res.data.first_name || '',
-                last_name: res.data.last_name || '',
-                email: res.data.email || '',
-                dob: res.data.dob || '',
-                gender: res.data.gender || '',
-                blood_group: res.data.blood_group || '',
-                contact_number: res.data.contact_number || '',
-                address: res.data.address || '',
-                profile_picture: res.data.profile_picture || null
+                first_name: profileRes.data.first_name || '',
+                last_name: profileRes.data.last_name || '',
+                email: profileRes.data.email || '',  
+                dob: profileRes.data.dob || '',
+                gender: profileRes.data.gender || '',
+                blood_group: profileRes.data.blood_group || '',
+                contact_number: profileRes.data.contact_number || '',
+                address: profileRes.data.address || '',
+                profile_picture: profileRes.data.profile_picture || null
             });
         } catch (err) {
             console.error("Error fetching profile:", err);
@@ -107,20 +106,23 @@ function StudentHome() {
         setError(null);
 
         try {
-            const formData = new FormData();
-            formData.append('first_name', e.target.first_name.value);
-            formData.append('last_name', e.target.last_name.value);
-            formData.append('contact_number', e.target.contact_number.value);
-            formData.append('address', e.target.address.value);
-            formData.append('gender', e.target.gender.value);
-            formData.append('blood_group', e.target.blood_group.value);
-            formData.append('dob', e.target.dob.value);
+            const formDataToSend = new FormData();
+            
+            formDataToSend.append('first_name', formData.first_name || '');
+            formDataToSend.append('last_name', formData.last_name || '');
+            formDataToSend.append('email', formData.email || '');
+            formDataToSend.append('contact_number', formData.contact_number || '');
+            formDataToSend.append('address', formData.address || '');
+            formDataToSend.append('gender', formData.gender || '');
+            formDataToSend.append('blood_group', formData.blood_group || '');
+            formDataToSend.append('dob', formData.dob || '');
 
-            if (e.target.profile_picture.files[0]) {
-                formData.append('profile_picture', e.target.profile_picture.files[0]);
+            const fileInput = e.target.querySelector('input[type="file"]');
+            if (fileInput && fileInput.files[0]) {
+                formDataToSend.append('profile_picture', fileInput.files[0]);
             }
 
-            const response = await api.put('/api/student/profile/', formData, {
+            const response = await api.put('/api/student/profile/', formDataToSend, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }
@@ -136,6 +138,9 @@ function StudentHome() {
                     profile_picture: `${response.data.profile_picture}?t=${timestamp}`
                 });
             }
+            
+            setEditMode(false);
+            
         } catch (err) {
             console.error('Update error details:', err);
             setError('Failed to update profile');

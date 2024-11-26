@@ -211,6 +211,8 @@ class CreateStudentView(generics.CreateAPIView):
         # Create user account
         user = User.objects.create_user(
             username=self.request.data.get('username'),
+            first_name=self.request.data.get('first_name'),
+            last_name=self.request.data.get('last_name'),
             email=self.request.data.get('email'),
             password=self.request.data.get('password')
         )
