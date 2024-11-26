@@ -1,8 +1,12 @@
 import axios from "axios";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "./constants";
 
+const API_URL = process.env.NODE_ENV === 'production' 
+    ? 'https://illumine-backend.onrender.com'
+    : 'http://localhost:8000';
+
 const api = axios.create({
-    baseURL: "http://localhost:8000",
+    baseURL: API_URL,
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
