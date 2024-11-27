@@ -8,7 +8,8 @@ const api = axios.create({
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
-    }
+    },
+    timeout: 30000  // 30 seconds timeout
 });
 
 // Custom error handling function
@@ -138,6 +139,15 @@ api.interceptors.response.use(
             console.error('Network Error:', error.request);
         } else {
             console.error('Error:', error.message);
+        }
+
+        if (error.code === 'ECONNABORTED') {
+            console.error('Request timed out');
+            // Handle timeout specifically
+            return Promise.reject({
+                type: 'TIMEOUT_ERROR',
+                message: 'The request timed out. Please try again.'
+            });
         }
 
         return Promise.reject(error);

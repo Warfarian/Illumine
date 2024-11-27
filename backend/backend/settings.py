@@ -128,6 +128,8 @@ DATABASES = {
         "PORT": os.getenv('DB_PORT', '21527'),
         "OPTIONS": {
             "sslmode": "require",
+            "connect_timeout": 10,
+            "timeout": 30
         }
     }
 }   
