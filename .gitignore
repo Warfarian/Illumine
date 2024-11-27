@@ -166,3 +166,8 @@ cython_debug/
 
 .env
 .env*
+
+.choreo/
+
+.env.production
+.env.development
