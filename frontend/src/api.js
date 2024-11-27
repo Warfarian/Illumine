@@ -9,7 +9,7 @@ const LOCAL_API_URL = "http://localhost:8000";
 const isDevelopment = import.meta.env.MODE === 'development';
 
 // Select API URL based on environment
-const API_URL = import.meta.env.VITE_API_URL || (isDevelopment ? LOCAL_API_URL : CHOREO_API_PATH);
+const API_URL = LOCAL_API_URL;
 
 console.log('Environment:', import.meta.env.MODE);
 console.log('Using API URL:', API_URL);
@@ -53,15 +53,7 @@ api.interceptors.response.use(
         originalRequest._retry = true;
 
         if (error.code === 'ERR_NETWORK' || error.response?.status === 503) {
-            console.log('Network error, retrying with alternative URL...');
-            
-            // Switch URL for retry
-            originalRequest.baseURL = originalRequest.baseURL === CHOREO_API_PATH 
-                ? LOCAL_API_URL 
-                : CHOREO_API_PATH;
-
-            console.log('Retrying with URL:', originalRequest.baseURL);
-            
+            console.log('Network error, retrying...');
             return api(originalRequest);
         }
 
