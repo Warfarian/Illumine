@@ -25,10 +25,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-+s0i$qa$2^#*x+82a9kxt2**lf=s&)0es7g&zfxql(3=5riu6x'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['illumine-backend.onrender.com', 'localhost', '127.0.0.1']
 
@@ -124,8 +124,6 @@ DATABASES = {
         conn_max_age=600
     )
 }
-
-print("DATABASE_URL:", os.getenv('DATABASE_URL'))
 
 if DEBUG:
     DATABASES = {
