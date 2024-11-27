@@ -1,10 +1,10 @@
 import axios from "axios";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "./constants";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = "/choreo-apis/illumineuniversity/backend/v1";
 
 const api = axios.create({
-    baseURL: API_URL,
+    baseURL: import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL : API_URL,
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
