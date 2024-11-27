@@ -1,7 +1,7 @@
 import axios from "axios";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "./constants";
 
-const API_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL : "/choreo-apis/illumineuniversity/backend/v1";
+const API_URL = import.meta.env.VITE_API_URL || "/choreo-apis/illumineuniversity/backend/v1";
 
 const api = axios.create({
     baseURL: API_URL,
@@ -79,6 +79,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
+        console.log('Full error details:', {
+            status: error.response?.status,
+            url: error.config?.url,
+            baseURL: error.config?.baseURL,
+            fullURL: error.config?.baseURL + error.config?.url,
+            headers: error.config?.headers,
+            data: error.response?.data
+        });
         const originalRequest = error.config;
 
         // Prevent infinite refresh loops
