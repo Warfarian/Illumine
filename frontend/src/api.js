@@ -1,7 +1,7 @@
 import axios from "axios";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "./constants";
 
-const API_URL = import.meta.env.VITE_API_URL || "/choreo-apis/illumineuniversity/backend/v1";
+const API_URL = import.meta.env.VITE_API_URL || "https://7d0d6746-b26a-430f-891e-45622b282d4a-dev.e1-eu-north-azure.choreoapis.dev/illumineuniversity/backend/v1.0";
 
 const api = axios.create({
     baseURL: API_URL,
@@ -9,7 +9,7 @@ const api = axios.create({
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     },
-    timeout: 30000  // 30 seconds timeout
+    timeout: 50000  
 });
 
 // Custom error handling function
