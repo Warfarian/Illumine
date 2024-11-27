@@ -1,7 +1,0 @@
-   services:
-     - type: web
-       name: illumine-backend
-       env: python
-       rootDir: backend
-
-   

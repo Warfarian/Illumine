@@ -81,38 +81,57 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
+        // Prevent infinite refresh loops
+        if (originalRequest?.url === '/api/token/refresh/') {
+            localStorage.clear();
+            window.location.href = '/login';
+            return Promise.reject(error);
+        }
+
         // If error is 401 and we haven't tried refreshing token yet
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
 
             try {
                 const refreshToken = localStorage.getItem('refresh_token');
-                console.log('Attempting refresh with token:', refreshToken); // Debug log
-
+                
                 if (!refreshToken) {
                     throw new Error('No refresh token available');
                 }
 
                 const response = await axios.post(
                     `${API_URL}/api/token/refresh/`,
-                    { refresh: refreshToken }
+                    { refresh: refreshToken },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
                 );
 
                 if (response.data.access) {
                     localStorage.setItem('access_token', response.data.access);
+                    api.defaults.headers.Authorization = `Bearer ${response.data.access}`;
                     originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
                     return api(originalRequest);
                 }
             } catch (refreshError) {
                 console.error('Token refresh failed:', refreshError);
-                // Clear auth data and redirect to login
-                localStorage.removeItem('access_token');
-                localStorage.removeItem('refresh_token');
-                localStorage.removeItem('user_role');
+                localStorage.clear();
                 window.location.href = '/login';
                 return Promise.reject(refreshError);
             }
         }
+
+        // Handle other errors
+        if (error.response) {
+            console.error(`API Error ${error.response.status}:`, error.response.data);
+        } else if (error.request) {
+            console.error('Network Error:', error.request);
+        } else {
+            console.error('Error:', error.message);
+        }
+
         return Promise.reject(error);
     }
 );

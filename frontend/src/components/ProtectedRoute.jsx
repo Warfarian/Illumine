@@ -11,7 +11,7 @@ function ProtectedRoute({ children, allowedRoles }) {
     const token = localStorage.getItem('access_token');
 
     useEffect(() => {
-        console.log("Protected Route Check:", {  // Add debug logging
+        console.log("Protected Route Check:", {  
             userRole,
             allowedRoles,
             hasToken: !!token
@@ -23,7 +23,7 @@ function ProtectedRoute({ children, allowedRoles }) {
         }
 
         if (!userRole || !allowedRoles.includes(userRole)) {
-            console.log("Unauthorized access attempt");  // Add debug logging
+            console.log("Unauthorized access attempt");  
             navigate('/login', { replace: true });
         }
     }, [navigate, location, userRole, allowedRoles, token]);

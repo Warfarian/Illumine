@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
-import { updateProfile } from "../api";
-import Avatar from '../components/Avatar';
+import { useState, useEffect } from "react";
 import api from "../api";
 import '../styles/pages/StudentHome.css';
 
@@ -28,39 +26,63 @@ const styles = {
 
 function StudentHome() {
     const [profile, setProfile] = useState(null);
-    const [editMode, setEditMode] = useState(false);
-    const [formData, setFormData] = useState({});
+    const [subjects, setSubjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [successMessage, setSuccessMessage] = useState("");
+    const [editMode, setEditMode] = useState(false);
+    const [formData, setFormData] = useState({});
     const [selectedImage, setSelectedImage] = useState(null);
-    const [subjects, setSubjects] = useState([]);
+    const [successMessage, setSuccessMessage] = useState("");
 
-    // Use useCallback to memoize the fetch function
-    const fetchData = useCallback(async () => {
-        try {
-            setLoading(true);
-            const [profileRes, subjectsRes] = await Promise.all([
-                api.get("/api/student/profile/"),
-                api.get('/api/student/subjects/')
-            ]);
-
-            setProfile(profileRes.data);
-            setFormData(profileRes.data);
-            setSubjects(subjectsRes.data);
-            setError(null);
-        } catch (err) {
-            console.error("Error fetching data:", err);
-            setError(err.response?.data?.error || "Error loading data");
-        } finally {
-            setLoading(false);
-        }
-    }, []); // Empty dependency array since this doesn't depend on any props or state
-
-    // Single useEffect for initial data fetch
     useEffect(() => {
+        let mounted = true;
+        
+        // Add error handling for unauthorized access
+        if (!localStorage.getItem('access_token')) {
+            setError('No authentication token found');
+            setLoading(false);
+            return;
+        }
+
+        const fetchData = async () => {
+            if (!mounted) return;
+
+            try {
+                const [profileRes, subjectsRes] = await Promise.all([
+                    api.get("/api/student/profile/"),
+                    api.get('/api/student/subjects/')
+                ]);
+
+                if (mounted) {
+                    setProfile(profileRes.data);
+                    setSubjects(subjectsRes.data);
+                    setFormData(profileRes.data);
+                    setError(null);
+                }
+            } catch (err) {
+                console.error("Error fetching data:", err);
+                if (mounted) {
+                    if (err.response?.status === 401) {
+                        localStorage.clear(); 
+                        window.location.href = '/login'; 
+                        return;
+                    }
+                    setError(err.response?.data?.error || "Error loading data");
+                }
+            } finally {
+                if (mounted) {
+                    setLoading(false);
+                }
+            }
+        };
+
         fetchData();
-    }, [fetchData]);
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
 
     const handleEditToggle = () => {
         setEditMode(!editMode);
@@ -111,6 +133,7 @@ function StudentHome() {
             setFormData(response.data);
             setEditMode(false);
             setSelectedImage(null);
+            setSuccessMessage("Profile updated successfully!");
             
         } catch (err) {
             console.error('Update error:', err);
@@ -120,7 +143,6 @@ function StudentHome() {
         }
     };
 
-    // Render function
     if (loading) {
         return <div className="loading">Loading...</div>;
     }
@@ -143,22 +165,26 @@ function StudentHome() {
                         </div>
                         <div style={styles.profilePicture}>
                             <img
-                                src={profile.profile_picture || '/default-avatar.png'}
+                                src={selectedImage || (profile.profile_picture || '/default-avatar.png')}
                                 alt="Profile"
                                 style={{
                                     width: '150px',
                                     height: '150px',
                                     objectFit: 'cover',
                                     borderRadius: '50%',
-                                    border: '3px solid #fff',
+                                    border: '3px solid #fff',   
                                     boxShadow: '0 0 10px rgba(0,0,0,0.1)'
-                                }}
-                                onError={(e) => {
-                                    e.target.src = '/default-avatar.png';
                                 }}
                             />
                         </div>
                     </div>
+
+                    {successMessage && (
+                        <div className="success-message">
+                            {successMessage}
+                        </div>
+                    )}
+
                     {!editMode ? (
                         <div className="info-section">
                             <p><strong>First Name:</strong> {profile.first_name || "Not provided"}</p>

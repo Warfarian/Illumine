@@ -1,17 +1,15 @@
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import Form from "../components/Forms";
 import '../styles/styles.css';
-import axios from 'axios';
-import  api  from '../api';
+import api from '../api';
 
 function Login() {
     const [error, setError] = useState(null);
     const navigate = useNavigate();
-    const location = useLocation();
 
     const handleLoginSuccess = (data) => {
-        console.log('Login response:', data); // Debug log
+        console.log('Login response:', data);
 
         if (!data.access || !data.refresh) {
             console.error('Missing token data:', data);
@@ -23,12 +21,6 @@ function Login() {
         localStorage.setItem('refresh_token', data.refresh);
         localStorage.setItem('user_role', data.role?.toLowerCase());
 
-        console.log('Stored auth data:', {  // Debug log
-            access: !!localStorage.getItem('access_token'),
-            refresh: !!localStorage.getItem('refresh_token'),
-            role: localStorage.getItem('user_role')
-        });
-
         // Navigate based on role
         const role = data.role?.toLowerCase();
         const redirectPath = role === 'student' ? '/student_home' : '/faculty_home';
@@ -36,7 +28,7 @@ function Login() {
     };
 
     const handleLoginFailure = (error) => {
-        console.error("Login failure:", error); // Debug log
+        console.error("Login failure:", error);
         
         // Clear any existing tokens
         localStorage.removeItem('access_token');
@@ -44,26 +36,6 @@ function Login() {
         localStorage.removeItem('user_role');
 
         setError(error.response?.data?.detail || "Login failed. Please try again.");
-    };
-
-    const handleLogin = async (values) => {
-        try {
-            const response = await api.post('/api/token/', values);
-            console.log('Login response:', response.data); // Debug log
-            
-            // Store tokens
-            localStorage.setItem('accessToken', response.data.access);
-            localStorage.setItem('refreshToken', response.data.refresh);
-            localStorage.setItem('userRole', response.data.role);
-            
-            // Verify stored data
-            console.log('Stored tokens:', {
-                access: localStorage.getItem('accessToken'),
-                role: localStorage.getItem('userRole')
-            });
-        } catch (error) {
-            console.error('Login error:', error);
-        }
     };
 
     return (
