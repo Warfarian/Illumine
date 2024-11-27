@@ -1,14 +1,16 @@
-Illumine - College Management System
+# Illumine - College Management System
+
 This is a comprehensive web-based solution for managing college operations. Built with React, DRF, Django and PostgreSQL, it streamlines academic and administrative tasks for faculty and students. The system is deployed on Choreo for enhanced performance and accessibility.
 
-Video Demo: [Link](https://youtu.be/2k784pHXk7c)
+**Video Demo:** [Link](https://youtu.be/2k784pHXk7c)
 
-Live Demo: 
+**Live Demo:** 
 
 Web App: [Link](https://16e4a1c6-50f9-4104-b012-b45d80d7eeba.e1-eu-north-azure.choreoapps.dev/login)
 Backend: [Link](https://7d0d6746-b26a-430f-891e-45622b282d4a-dev.e1-eu-north-azure.choreoapis.dev/illumineuniversity/backend/v1.0)
 
-🎯 Features
+### 🎯 Features
+
 Faculty Portal
 
 Authentication: Secure login using JWT.
@@ -35,7 +37,7 @@ View enrolled subjects and assigned faculty.
 
 
 
-🛠️ Tech Stack
+### 🛠️ Tech Stack
 
 Frontend: React.js
 Backend: Django REST Framework
@@ -45,21 +47,21 @@ Authentication: JWT for secure user sessions
 
 
 
-🏗️ System Architecture
+### 🏗️ System Architecture
 
 Frontend (React) ←→ API Gateway(Django Rest Framework) ←→ Backend (Django) ←→ Database (PostgreSQL using Choreo)
 
 
-🚀 Getting Started
+### 🚀 Getting Started
 
-Prerequisites
+### Prerequisites
 
 - Node.js (v14 or higher)
 - Python (v3.8 or higher)
 - PostgreSQL
 - Git
 
-Local Development Setup
+**Local Development Setup**
 
 1. Clone the repository:
 
@@ -116,7 +118,7 @@ npm install
 ```bash
 npm start
 ``` 
-🔐 Environment Variables
+###  🔐 Environment Variables
 Backend (.env)
 
 ```bash
@@ -132,7 +134,7 @@ Frontend (vite.env)
 VITE_API_URL=http://localhost:8000 (replace with your backend URL)
 ```
 
-📚 API Documentation
+###  📚 API Documentation
 
 Authentication Endpoints
 
@@ -152,14 +154,14 @@ Student Endpoints
 - ```PUT /api/students/profile/``` - Update student profile
 - ```GET /api/students/subjects/``` - View enrolled subjects
 
-🔒 Security Features
+###  🔒 Security Features
 - JWT Authentication
 - Password Hashing
 - CORS Protection
 - Input Validation
 - File Upload Validation
 
-🌐 Deployment
+###  🌐 Deployment
 The application is deployed on Choreo with the following components:
 
 - Frontend Service (React)
@@ -168,7 +170,7 @@ The application is deployed on Choreo with the following components:
 
 Refer to the choreo.yaml file for detailed configurations.
 
-📁 Project Structure
+###  📁 Project Structure
 
 ```bash
 Illumine/
@@ -197,7 +199,9 @@ Illumine/
 ```
 
 
-📘 System Diagrams
+### 📘 System Diagrams
+
+**1. Entity Relationship Diagram**
 
 ![Entity Relationship Diagram](./diagrams/ERD.png)
 The Entity Relationship Diagram (ERD) represents the data model of the College Management System, illustrating key entities (tables) and their relationships.
@@ -210,7 +214,7 @@ Key Entities:
 - Faculty: Stores faculty member details, such as username, id, name, email, and department.
 
 
-2. System Architecture Flowchart
+**2. System Architecture Flowchart**
 
 ![System Architecture Flowchart](./diagrams/system2.png)
 
@@ -221,7 +225,7 @@ The System Architecture Flowchart showcases the overall design of the College Ma
 - Database Service: Maintains data storage and retrieval using PostgreSQL.
 
 
-3. Technology Stack Overview
+**3. Technology Stack Overview**
 
 ![Technology Stack Overview](./diagrams/system1.png)
 
@@ -233,7 +237,7 @@ Key Components:
 - Database: Powered by PostgreSQL, ensuring reliable and efficient data management.
 
 
-🌐 Links
+### 🌐 Links
 
 - [Choreo](https://choreo.dev/)
 - [Django](https://www.djangoproject.com/)
