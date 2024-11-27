@@ -26,17 +26,25 @@ function Register() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setIsLoading(true);
+        setError('');
         
         try {
             const response = await api.post('/api/register/', formData);
             
             if (response.data) {
                 alert('Registration successful! Please login.');
-                navigate('/login');  // Redirect to login page
+                navigate('/login');
             }
         } catch (error) {
             console.error('Registration error:', error);
-            alert(error.response?.data?.detail || 'Registration failed');
+            if (error.response?.status === 503) {
+                setError('Unable to connect to the service. Please try again later.');
+            } else {
+                setError(error.response?.data?.detail || 'Registration failed. Please try again.');
+            }
+        } finally {
+            setIsLoading(false);
         }
     };
 

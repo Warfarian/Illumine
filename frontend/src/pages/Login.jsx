@@ -9,22 +9,35 @@ function Login() {
     const navigate = useNavigate();
 
     const handleLoginSuccess = (data) => {
-        console.log('Login response:', data);
+        try {
+            console.log('Login response:', data);
 
-        if (!data.access || !data.refresh) {
-            console.error('Missing token data:', data);
-            return;
+            if (!data.access || !data.refresh) {
+                setError('Invalid response from server');
+                return;
+            }
+
+            // Store tokens
+            localStorage.setItem('access_token', data.access);
+            localStorage.setItem('refresh_token', data.refresh);
+            localStorage.setItem('user_role', data.role?.toLowerCase());
+
+            // Set default auth header for future requests
+            api.defaults.headers.common['Authorization'] = `Bearer ${data.access}`;
+
+            // Navigate based on role
+            const role = data.role?.toLowerCase();
+            if (!role) {
+                setError('User role not specified');
+                return;
+            }
+
+            const redirectPath = role === 'student' ? '/student_home' : '/faculty_home';
+            navigate(redirectPath);
+        } catch (error) {
+            console.error('Error in handleLoginSuccess:', error);
+            setError('An error occurred while processing login');
         }
-
-        // Store tokens
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
-        localStorage.setItem('user_role', data.role?.toLowerCase());
-
-        // Navigate based on role
-        const role = data.role?.toLowerCase();
-        const redirectPath = role === 'student' ? '/student_home' : '/faculty_home';
-        navigate(redirectPath);
     };
 
     const handleLoginFailure = (error) => {

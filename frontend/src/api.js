@@ -1,17 +1,8 @@
 import axios from "axios";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "./constants";
 
-// Define API URLs
-const CHOREO_API_PATH = "/choreo-apis/illumineuniversity/backend/v1.0";
-const LOCAL_API_URL = "http://localhost:8000";
+const API_URL = "http://localhost:8000";
 
-// Get the current environment
-const isDevelopment = import.meta.env.MODE === 'development';
-
-// Select API URL based on environment
-const API_URL = LOCAL_API_URL;
-
-console.log('Environment:', import.meta.env.MODE);
 console.log('Using API URL:', API_URL);
 
 const api = axios.create({
@@ -20,17 +11,17 @@ const api = axios.create({
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     },
-    timeout: 30000  // 30 seconds
+    timeout: 30000,
+    withCredentials: true,
 });
 
 // Add request interceptor for debugging
 api.interceptors.request.use(
     (config) => {
-        console.log('Making request to:', {
-            fullUrl: `${config.baseURL}${config.url}`,
-            method: config.method,
-            headers: config.headers
-        });
+        const token = localStorage.getItem('access_token');
+        if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
         return config;
     },
     (error) => {

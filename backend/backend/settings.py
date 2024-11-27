@@ -31,7 +31,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = [
+    'localhost', 
+    '127.0.0.1',
+    '16e4a1c6-50f9-4104-b012-b45d80d7eeba.e1-eu-north-azure.choreoapps.dev'
+]
 
 
 REST_FRAMEWORK = {
@@ -127,9 +131,7 @@ DATABASES = {
         "HOST": os.getenv('DB_HOST'),
         "PORT": os.getenv('DB_PORT', '21527'),
         "OPTIONS": {
-            "sslmode": "require",
-            "connect_timeout": 10,
-            "timeout": 30
+            "sslmode": "require"
         }
     }
 }   
@@ -185,27 +187,29 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
 ]
 
+CORS_ALLOW_ALL_ORIGINS = True
+
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
-    "DELETE",
-    "GET",
-    "OPTIONS",
-    "PATCH",
-    "POST",
-    "PUT",
+    'GET',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'OPTIONS'
 ]
 
-CORS_ALLOW_HEADERS = [  
-    "accept",
-    "accept-encoding",
-    "authorization",
-    "content-type",
-    "dnt",
-    "origin",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with",
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
 ]
 
 LOGGING = {
