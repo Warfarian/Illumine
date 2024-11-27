@@ -1,7 +1,14 @@
 import axios from "axios";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "./constants";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://7d0d6746-b26a-430f-891e-45622b282d4a-dev.e1-eu-north-azure.choreoapis.dev/illumineuniversity/backend/v1.0";
+// Define possible API URLs
+const CHOREO_API_PATH = "/choreo-apis/illumineuniversity/backend/v1.0";  // Updated to v1.0
+const LOCAL_API_URL = "http://localhost:8000";
+
+// Select API URL with proper fallback
+const API_URL = import.meta.env.VITE_API_URL || CHOREO_API_PATH || LOCAL_API_URL;
+
+console.log('Using API URL:', API_URL); // Debug log
 
 const api = axios.create({
     baseURL: API_URL,
@@ -9,17 +16,84 @@ const api = axios.create({
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     },
-    timeout: 50000  
+    timeout: 50000,  
+
+    validateStatus: function (status) {
+        return status >= 200 && status < 500; 
+    }
 });
+
+// Enhanced error handling and retry logic
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+        
+        console.log('Request failed:', {
+            url: originalRequest?.url,
+            method: originalRequest?.method,
+            baseURL: originalRequest?.baseURL,
+            timeout: originalRequest?.timeout,
+            errorMessage: error.message,
+            errorCode: error.code,
+            status: error.response?.status
+        });
+
+        // Don't retry if we've already tried 2 times
+        if (originalRequest._retry >= 2) {
+            if (error.code === 'ECONNABORTED') {
+                return Promise.reject({
+                    type: 'TIMEOUT_ERROR',
+                    message: 'The service is currently unavailable. Please try again later.',
+                    details: error.message
+                });
+            }
+            return Promise.reject(error);
+        }
+
+        // Initialize retry count
+        originalRequest._retry = (originalRequest._retry || 0) + 1;
+
+        if (error.code === 'ECONNABORTED' || error.response?.status === 503) {
+            console.log(`Retrying request (attempt ${originalRequest._retry}/2)...`);
+            
+            // Increase timeout for retry attempts
+            originalRequest.timeout = originalRequest.timeout * 1.5;
+            
+            // Wait for 2 seconds before retrying
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Try alternative URL if main URL fails
+            if (originalRequest._retry === 2 && originalRequest.baseURL === CHOREO_API_PATH) {
+                console.log('Trying fallback URL...');
+                originalRequest.baseURL = LOCAL_API_URL;
+            }
+            
+            return api(originalRequest);
+        }
+
+        return Promise.reject(error);
+    }
+);
+
+// Add request interceptor for debugging
+api.interceptors.request.use(
+    (config) => {
+        console.log('Making request to:', config.baseURL + config.url);
+        return config;
+    },
+    (error) => {
+        console.error('Request error:', error);
+        return Promise.reject(error);
+    }
+);
 
 // Custom error handling function
 const handleApiError = (error) => {
     if (error.response) {
-        // Server responded with error status
         switch (error.response.status) {
             case 400:
                 console.error('Bad Request:', error.response.data);
-                // You might want to handle specific validation errors here
                 if (error.response.data.validation_errors) {
                     return Promise.reject({
                         type: 'VALIDATION_ERROR',
