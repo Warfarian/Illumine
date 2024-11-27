@@ -59,7 +59,19 @@ class Student(models.Model):
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
     blood_group = models.CharField(max_length=5, blank=True, null=True)
     dob = models.DateField(null=True, blank=True)
-    profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
+
+    def profile_picture_path(instance, filename):
+        # Get file extension
+        ext = filename.split('.')[-1]
+        # Create filename using username from related User model
+        filename = f"{instance.user.username}.{ext}"
+        return f'profile_pictures/{filename}'
+
+    profile_picture = models.ImageField(
+        upload_to=profile_picture_path,
+        null=True,
+        blank=True
+    )
 
     def assign_department_subjects(self):
         """Assign subjects based on department"""

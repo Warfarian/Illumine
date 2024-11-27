@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../api";
 import '../styles/pages/StudentHome.css';
+import { logout } from "../api";
 
 const styles = {
     dashboardHeader: {
@@ -109,9 +110,9 @@ function StudentHome() {
         try {
             const formDataToSend = new FormData();
             
-            // Append all fields, even if empty
+            // Append all non-file fields
             Object.keys(formData).forEach(key => {
-                if (key !== 'profile_picture') {  // Handle profile picture separately
+                if (key !== 'profile_picture') {
                     formDataToSend.append(key, formData[key] || '');
                 }
             });
@@ -128,18 +129,31 @@ function StudentHome() {
                 }
             });
 
-            // Update state with response data
+            console.log('Profile update response:', response.data);
+
+            // Immediately update the profile with the new data
             setProfile(response.data);
             setFormData(response.data);
-            setEditMode(false);
             setSelectedImage(null);
+            setEditMode(false);
             setSuccessMessage("Profile updated successfully!");
+
+            // Fetch the profile again to ensure we have the latest data
+            const refreshResponse = await api.get("/api/student/profile/");
+            setProfile(refreshResponse.data);
             
         } catch (err) {
             console.error('Update error:', err);
             setError(err.response?.data?.detail || 'Failed to update profile');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleImageSelect = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedImage(URL.createObjectURL(file));
         }
     };
 
@@ -153,7 +167,26 @@ function StudentHome() {
 
     return (
         <div className="container">
-            <h1 className="heading-1">Student Dashboard</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h1 className="heading-1">Student Dashboard</h1>
+                <button 
+                    onClick={() => logout()}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: '500',
+                        transition: 'background-color 0.2s',
+                    }}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#bb2d3b'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
+                >
+                    Logout
+                </button>
+            </div>
             
             {profile && (
                 <div className="profile-card">
@@ -165,14 +198,14 @@ function StudentHome() {
                         </div>
                         <div style={styles.profilePicture}>
                             <img
-                                src={selectedImage || (profile.profile_picture || '/default-avatar.png')}
+                                src={selectedImage || profile?.profile_picture || '/default-avatar.png'}
                                 alt="Profile"
                                 style={{
                                     width: '150px',
                                     height: '150px',
                                     objectFit: 'cover',
                                     borderRadius: '50%',
-                                    border: '3px solid #fff',   
+                                    border: '3px solid #fff',
                                     boxShadow: '0 0 10px rgba(0,0,0,0.1)'
                                 }}
                             />
@@ -210,11 +243,7 @@ function StudentHome() {
                                     <input
                                         type="file"
                                         name="profile_picture"
-                                        onChange={(e) => {
-                                            if (e.target.files[0]) {
-                                                setSelectedImage(URL.createObjectURL(e.target.files[0]));
-                                            }
-                                        }}
+                                        onChange={handleImageSelect}
                                         className="form-input"
                                         accept="image/*"
                                     />

@@ -32,78 +32,31 @@ class SubjectSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'faculty']
 
 class StudentSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(write_only=True)
-    password = serializers.CharField(write_only=True)
-    profile_picture = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    profile_picture = serializers.ImageField(required=False)
     
     class Meta:
         model = Student
         fields = [
             'id',
-            'username',
-            'password',
+            'username',  
             'first_name',
             'last_name',
             'email',
             'department',
-            'gender',
-            'blood_group',
+            'roll_number',
             'contact_number',
             'address',
+            'gender',
+            'blood_group',
+            'dob',
             'profile_picture'
-        ]
+        ]        
+        read_only_fields = ['roll_number', 'username']  # Make username read-only
 
-    def create(self, validated_data):
-        print("Starting create method with data:", validated_data)  # Debug print
-        
-        try:
-            # Extract user-specific data
-            username = validated_data.pop('username')
-            password = validated_data.pop('password')
-            email = validated_data.get('email')
-            
-            print(f"Creating user with username: {username}, email: {email}")  # Debug print
-
-            # Create User instance first
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=password,
-                first_name=validated_data.get('first_name', ''),
-                last_name=validated_data.get('last_name', '')
-            )
-            
-            print(f"User created with ID: {user.id}")  # Debug print
-
-            # Add to student group
-            student_group, _ = Group.objects.get_or_create(name='student')
-            user.groups.add(student_group)
-            
-            print("Creating student with data:", validated_data)  # Debug print
-            
-            # Create Student instance with the user
-            student = Student.objects.create(
-                user=user,
-                first_name=validated_data.get('first_name'),
-                last_name=validated_data.get('last_name'),
-                email=validated_data.get('email'),
-                department=validated_data.get('department'),
-                gender=validated_data.get('gender'),
-                blood_group=validated_data.get('blood_group'),
-                contact_number=validated_data.get('contact_number'),
-                address=validated_data.get('address')
-            )
-            
-            print(f"Student created with ID: {student.id}")  # Debug print
-            return student
-            
-        except Exception as e:
-            print(f"Error in create method: {str(e)}")  # Debug print
-            # If student creation fails, delete the user to avoid orphaned users
-            if 'user' in locals():
-                print(f"Deleting user due to error")  # Debug print
-                user.delete()
-            raise serializers.ValidationError(str(e))
+    def get_username(self, obj):
+        # Safely get username from related User model
+        return obj.user.username if obj.user else ''
 
     def get_profile_picture(self, obj):
         if obj.profile_picture:
@@ -112,6 +65,16 @@ class StudentSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.profile_picture.url)
             return obj.profile_picture.url
         return None
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['profile_picture'] = self.get_profile_picture(instance)
+        return data
+
+    def update(self, instance, validated_data):
+        # Remove username from validated_data if it exists
+        validated_data.pop('username', None)
+        return super().update(instance, validated_data)
 
 class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
@@ -169,40 +132,3 @@ class ProfileSerializer(serializers.ModelSerializer):
                 
         return data
 
-class StudentSerializer(serializers.ModelSerializer):
-    username = serializers.SerializerMethodField()  
-    
-    class Meta:
-        model = Student
-        fields = [
-            'id',
-            'username',
-            'first_name',
-            'last_name',
-            'email',
-            'department',
-            'roll_number',
-            'contact_number',
-            'address',
-            'gender',
-            'blood_group',
-            'dob',
-            'profile_picture'
-        ]        
-        read_only_fields = ['roll_number']
-
-    def get_profile_picture(self, obj):
-        if obj.profile_picture:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.profile_picture.url)
-            return obj.profile_picture.url
-        return None
-    
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data['profile_picture'] = self.get_profile_picture(instance)
-        return data
-
-    def get_username(self, obj):
-        return obj.user.username if obj.user else ''

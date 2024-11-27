@@ -35,3 +35,6 @@ urlpatterns = [
     path('api/faculty/students/<int:student_id>/', views.faculty_student_detail_view, name='faculty-student-detail'),
     path('api/faculty/promote-student/<int:student_id>/', PromoteToFacultyView.as_view(), name='promote-to-faculty'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

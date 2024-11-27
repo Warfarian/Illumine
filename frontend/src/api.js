@@ -156,4 +156,11 @@ export const updateProfile = async (profileData) => {
     }
 };
 
+export const logout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user_role');
+    window.location.href = '/login';
+};
+
 export default api;

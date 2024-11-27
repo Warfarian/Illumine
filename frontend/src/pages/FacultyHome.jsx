@@ -3,7 +3,7 @@ import api from '../api';
 import StudentFormModal from '../components/StudentFormModal';
 import '../styles/components/FacultyHome.css';
 import axios from 'axios';
-
+import { logout } from '../api';
 function FacultyHome() {
     const [profile, setProfile] = useState(null);
     const [students, setStudents] = useState([]);
@@ -174,6 +174,26 @@ function FacultyHome() {
 
     return (
         <div className="faculty-home">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h1 className="heading-1">Faculty Dashboard</h1>
+                <button 
+                    onClick={() => logout()}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: '500',
+                        transition: 'background-color 0.2s',
+                    }}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#bb2d3b'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
+                >
+                    Logout
+                </button>
+            </div>
             {/* Profile Section */}
             {profile && (
                 <div className="header">

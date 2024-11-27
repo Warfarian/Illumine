@@ -323,6 +323,8 @@ class StudentProfileView(APIView):
             # Handle file upload
             if 'profile_picture' in request.FILES:
                 student.profile_picture = request.FILES['profile_picture']
+                print("File name:", request.FILES['profile_picture'].name)
+                print("File size:", request.FILES['profile_picture'].size)
 
             # Update other fields
             for field in ['contact_number', 'address', 'gender', 'blood_group', 'dob']:
